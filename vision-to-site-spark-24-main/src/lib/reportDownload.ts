@@ -2,6 +2,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { AudienceRecord } from "./audienceData";
 import type { Segment } from "./segmentData";
+import type { ConceptResult, ConceptType } from "./conceptTestTypes";
+import type { StrategyOutput, MediaPlanResult } from "./orchestrationTypes";
 
 // Brand colour
 const BRAND = "#004638";
@@ -684,4 +686,493 @@ export function downloadCrosstabCsv(opts: {
   a.download = `CrossTab_${crosstab.rowLabel}_x_${crosstab.colLabel}_${new Date().toISOString().slice(0, 10)}.csv`.replace(/[^a-z0-9._-]/gi, "_");
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ─── Concept Test PDF ──────────────────────────────────────────────
+
+const CONCEPT_TYPE_LABELS: Record<ConceptType, string> = {
+  ad: "Ad / Campaign",
+  product: "Product",
+  message: "Message",
+  brand: "Brand Idea",
+};
+
+export function downloadConceptTestPdf(opts: {
+  conceptType: ConceptType;
+  conceptName: string;
+  category: string;
+  description: string;
+  audienceLabel: string;
+  audienceCount: number;
+  savedAt?: string;
+  result: ConceptResult;
+}) {
+  const { conceptType, conceptName, category, description, audienceLabel, audienceCount, savedAt, result } = opts;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  let page = 1;
+
+  const title = conceptName || "Untitled Concept";
+  const dateStr = savedAt
+    ? new Date(savedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+  // ── Page 1 ────────────────────────────────────────────────────────
+  addHeader(doc, "Concept Test Report", title);
+  addFooter(doc, page);
+  let y = 28;
+
+  // Concept info box
+  setFill(doc, BRAND_LIGHT);
+  setDraw(doc, BRAND);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(14, y, pageW(doc) - 28, 22, 2, 2, "FD");
+
+  setTextColor(doc, BRAND);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.text("CONCEPT TYPE", 18, y + 5);
+  doc.text("AUDIENCE", 75, y + 5);
+  doc.text("DATE", 145, y + 5);
+
+  setTextColor(doc, GREY_DARK);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text(CONCEPT_TYPE_LABELS[conceptType], 18, y + 10);
+  doc.text(`${audienceLabel}  (n=${audienceCount.toLocaleString()})`, 75, y + 10);
+  doc.text(dateStr, 145, y + 10);
+
+  if (category) {
+    setTextColor(doc, GREY_MID);
+    doc.setFontSize(7);
+    doc.text(`Category: ${category}`, 18, y + 16);
+  }
+
+  // Description (truncated)
+  setTextColor(doc, GREY_MID);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "italic");
+  const descLines = doc.splitTextToSize(description, pageW(doc) - 36);
+  const shownLines = descLines.slice(0, 2);
+  if (descLines.length > 2) shownLines[1] = shownLines[1].replace(/\s*$/, "…");
+  doc.text(shownLines, 18, y + 20);
+  y += 28;
+
+  // Overall score banner
+  const scoreCol = result.overall_score >= 70 ? "#22c55e" : result.overall_score >= 50 ? "#eab308" : "#ef4444";
+  setFill(doc, scoreCol);
+  doc.roundedRect(14, y, 44, 28, 2, 2, "F");
+  setTextColor(doc, WHITE);
+  doc.setFontSize(28);
+  doc.setFont("helvetica", "bold");
+  doc.text(String(result.overall_score), 36, y + 16, { align: "center" });
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.text("/ 100", 36, y + 22, { align: "center" });
+
+  setFill(doc, BRAND_LIGHT);
+  doc.roundedRect(62, y, pageW(doc) - 76, 28, 2, 2, "F");
+  setTextColor(doc, BRAND);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text(result.verdict_label, 68, y + 9);
+  setTextColor(doc, GREY_DARK);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  const verdictLines = doc.splitTextToSize(result.verdict_text, pageW(doc) - 80);
+  doc.text(verdictLines.slice(0, 2), 68, y + 16);
+
+  // Sentiment
+  doc.setFontSize(7);
+  setTextColor(doc, "#22c55e");
+  doc.text(`● ${result.positive_pct}% likely to engage`, 68, y + 25);
+  setTextColor(doc, "#ef4444");
+  doc.text(`● ${result.negative_pct}% unlikely to engage`, 120, y + 25);
+  y += 34;
+
+  // Dimension scores table
+  y = sectionTitle(doc, "Dimension Scores", y);
+  autoTable(doc, {
+    head: [["Dimension", "Score", "Rationale"]],
+    body: result.dimensions.map((d) => [d.name, `${d.score} / 100`, d.rationale]),
+    startY: y,
+    margin: { left: 14, right: 14 },
+    columnStyles: { 0: { cellWidth: 36 }, 1: { cellWidth: 22, halign: "center" }, 2: { cellWidth: "auto" } },
+    styles: { fontSize: 7.5, cellPadding: 2.5, lineColor: GREY_LIGHT, lineWidth: 0.2 },
+    headStyles: { fillColor: hexToRgb(BRAND), textColor: hexToRgb(WHITE), fontStyle: "bold", fontSize: 7.5 },
+    alternateRowStyles: { fillColor: hexToRgb(BRAND_LIGHT) },
+    didDrawCell: (hook) => {
+      // Colour the score cell
+      if (hook.column.index === 1 && hook.row.index >= 0 && hook.section === "body") {
+        const score = result.dimensions[hook.row.index]?.score ?? 0;
+        const col = score >= 70 ? "#22c55e" : score >= 50 ? "#eab308" : "#ef4444";
+        doc.setTextColor(...hexToRgb(col));
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.text(
+          `${score}`,
+          hook.cell.x + hook.cell.width / 2,
+          hook.cell.y + hook.cell.height / 2 + 1,
+          { align: "center" },
+        );
+      }
+    },
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  y = (doc as any).lastAutoTable?.finalY + 8 || y + 40;
+
+  // ── Page 2 ────────────────────────────────────────────────────────
+  addFooter(doc, page++);
+  doc.addPage();
+  addHeader(doc, "Concept Test Report", title);
+  y = 28;
+
+  // Strengths & Weaknesses side by side
+  const halfW = (pageW(doc) - 34) / 2;
+  y = sectionTitle(doc, "Strengths & Weaknesses", y);
+
+  const strengthRows = result.strengths.map((s) => ["✓", s]);
+  const weaknessRows = result.weaknesses.map((w) => ["✗", w]);
+
+  autoTable(doc, {
+    head: [["", "Strengths"]],
+    body: strengthRows,
+    startY: y,
+    margin: { left: 14, right: pageW(doc) / 2 + 2 },
+    columnStyles: { 0: { cellWidth: 6, halign: "center" } },
+    styles: { fontSize: 7.5, cellPadding: 2, lineColor: GREY_LIGHT, lineWidth: 0.2 },
+    headStyles: { fillColor: [34, 197, 94] as [number, number, number], textColor: hexToRgb(WHITE), fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [240, 253, 244] as [number, number, number] },
+  });
+
+  autoTable(doc, {
+    head: [["", "Weaknesses / Risks"]],
+    body: weaknessRows,
+    startY: y,
+    margin: { left: pageW(doc) / 2 + 2, right: 14 },
+    columnStyles: { 0: { cellWidth: 6, halign: "center" } },
+    styles: { fontSize: 7.5, cellPadding: 2, lineColor: GREY_LIGHT, lineWidth: 0.2 },
+    headStyles: { fillColor: [234, 179, 8] as [number, number, number], textColor: hexToRgb(WHITE), fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [254, 252, 232] as [number, number, number] },
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  y = Math.max((doc as any).lastAutoTable?.finalY ?? y, y) + 8;
+
+  // Segment reactions
+  y = sectionTitle(doc, "Segment Reactions", y);
+  autoTable(doc, {
+    head: [["Sub-group", "Reaction", "Sentiment"]],
+    body: result.segment_reactions.map((sr) => [sr.segment, sr.reaction, sr.sentiment.toUpperCase()]),
+    startY: y,
+    margin: { left: 14, right: 14 },
+    columnStyles: { 0: { cellWidth: 40 }, 2: { cellWidth: 22, halign: "center" } },
+    styles: { fontSize: 7.5, cellPadding: 2.5, lineColor: GREY_LIGHT, lineWidth: 0.2 },
+    headStyles: { fillColor: hexToRgb(BRAND), textColor: hexToRgb(WHITE), fontStyle: "bold" },
+    alternateRowStyles: { fillColor: hexToRgb(BRAND_LIGHT) },
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  y = (doc as any).lastAutoTable?.finalY + 8 || y + 30;
+
+  // Consumer Verbatims
+  if (y > 200) {
+    addFooter(doc, page++);
+    doc.addPage();
+    addHeader(doc, "Concept Test Report", title);
+    y = 28;
+  }
+  y = sectionTitle(doc, "Consumer Verbatims", y);
+  autoTable(doc, {
+    head: [["Quote", "Persona", "Sentiment"]],
+    body: result.verbatims.map((v) => [`"${v.quote}"`, v.persona, v.sentiment.toUpperCase()]),
+    startY: y,
+    margin: { left: 14, right: 14 },
+    columnStyles: { 0: { fontStyle: "italic" }, 1: { cellWidth: 40 }, 2: { cellWidth: 22, halign: "center" } },
+    styles: { fontSize: 7.5, cellPadding: 2.5, lineColor: GREY_LIGHT, lineWidth: 0.2 },
+    headStyles: { fillColor: hexToRgb(BRAND), textColor: hexToRgb(WHITE), fontStyle: "bold" },
+    alternateRowStyles: { fillColor: hexToRgb(BRAND_LIGHT) },
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  y = (doc as any).lastAutoTable?.finalY + 8 || y + 40;
+
+  // Recommendations
+  if (y > 210) {
+    addFooter(doc, page++);
+    doc.addPage();
+    addHeader(doc, "Concept Test Report", title);
+    y = 28;
+  }
+  y = sectionTitle(doc, "Optimization Recommendations", y);
+  result.recommendations.forEach((rec, i) => {
+    // Number badge
+    setFill(doc, BRAND);
+    doc.circle(18, y + 2.5, 3, "F");
+    setTextColor(doc, WHITE);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text(String(i + 1), 18, y + 3.5, { align: "center" });
+
+    setTextColor(doc, GREY_DARK);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    const lines = doc.splitTextToSize(rec, pageW(doc) - 42);
+    doc.text(lines, 24, y + 3);
+    y += lines.length * 5 + 4;
+  });
+
+  addFooter(doc, page);
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const slug = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  doc.save(`ConceptTest_${slug}_${dateTag}.pdf`);
+}
+
+// ─── Orchestration PDF ─────────────────────────────────────────────
+
+export interface OrchestrationExportOpts {
+  productName: string;
+  productCategory: string;
+  productDescription: string;
+  businessObjective: string;
+  audienceLabel: string;
+  audienceCount: number;
+  outputs: Partial<Record<string, StrategyOutput>>;
+  mediaPlan?: MediaPlanResult;
+  rationale?: string;
+}
+
+function fmt$(n: number) {
+  return "$" + (n >= 1_000_000 ? (n / 1_000_000).toFixed(2) + "M" : n >= 1_000 ? (n / 1_000).toFixed(1) + "K" : n.toFixed(2));
+}
+function fmtN(n: number) {
+  return n >= 1_000_000_000 ? (n / 1_000_000_000).toFixed(1) + "B"
+    : n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + "M"
+    : n >= 1_000 ? (n / 1_000).toFixed(0) + "K"
+    : Math.round(n).toLocaleString();
+}
+
+export function downloadOrchestrationPdf(opts: OrchestrationExportOpts) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const W = pageW(doc);
+  let page = 1;
+
+  const TAB_LABELS: Record<string, string> = {
+    brand: "Brand Strategy",
+    comms: "Communications",
+    ads: "Ad Tactics",
+  };
+
+  const addStrategyOutput = (type: string, output: StrategyOutput) => {
+    if (page > 1) doc.addPage();
+    addHeader(doc, opts.productName || "Orchestration Report", TAB_LABELS[type] || type);
+    addFooter(doc, page);
+    let y = 30;
+
+    // Headline banner
+    setFill(doc, BRAND_LIGHT);
+    doc.roundedRect(14, y, W - 28, 18, 2, 2, "F");
+    setTextColor(doc, BRAND);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(output.headline, W / 2, y + 7, { align: "center" });
+    setTextColor(doc, GREY_DARK);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const sumLines = doc.splitTextToSize(output.summary, W - 36);
+    doc.text(sumLines, W / 2, y + 13, { align: "center" });
+    y += 24;
+
+    // Sections in 2-col grid
+    const colW = (W - 28 - 4) / 2;
+    let col = 0;
+    let colY = [y, y];
+
+    output.sections.forEach((sec) => {
+      const x = 14 + col * (colW + 4);
+      let sy = colY[col];
+
+      // Section card background
+      setFill(doc, "#f9f9f9");
+      doc.roundedRect(x, sy, colW, 2, 1, 1, "F"); // placeholder height, will adjust
+
+      setTextColor(doc, BRAND);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.text(sec.title.toUpperCase(), x + 3, sy + 5);
+      sy += 9;
+
+      setTextColor(doc, GREY_MID);
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "normal");
+      const bodyLines = doc.splitTextToSize(sec.body, colW - 6);
+      doc.text(bodyLines, x + 3, sy);
+      sy += bodyLines.length * 4 + 2;
+
+      if (sec.bullets?.length) {
+        sec.bullets.forEach((b) => {
+          const bLines = doc.splitTextToSize(`• ${b}`, colW - 9);
+          // page overflow check
+          if (sy + bLines.length * 4 > pageH(doc) - 20) {
+            page++;
+            doc.addPage();
+            addHeader(doc, opts.productName || "Orchestration Report", TAB_LABELS[type] || type);
+            addFooter(doc, page);
+            sy = 30;
+            colY = [sy, sy];
+          }
+          setTextColor(doc, GREY_DARK);
+          doc.setFontSize(7);
+          doc.text(bLines, x + 5, sy);
+          sy += bLines.length * 4 + 1;
+        });
+      }
+      sy += 4;
+      colY[col] = sy;
+      col = col === 0 ? 1 : 0;
+    });
+
+    page++;
+  };
+
+  // Page 1: Cover / Brief
+  addHeader(doc, opts.productName || "Orchestration Report", "Audience Intelligence Report");
+  addFooter(doc, page);
+  let y = 30;
+
+  // Brief card
+  setFill(doc, BRAND_LIGHT);
+  doc.roundedRect(14, y, W - 28, 40, 3, 3, "F");
+  setTextColor(doc, BRAND);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text("PRODUCT BRIEF", 20, y + 7);
+  setTextColor(doc, GREY_DARK);
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.text(opts.productName || "(Untitled)", 20, y + 14);
+  setTextColor(doc, GREY_MID);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  if (opts.productCategory) doc.text(`Category: ${opts.productCategory}`, 20, y + 20);
+  if (opts.businessObjective) {
+    const objLines = doc.splitTextToSize(`Objective: ${opts.businessObjective}`, W - 48);
+    doc.text(objLines, 20, y + 26);
+  }
+  // Audience badge
+  setFill(doc, BRAND);
+  doc.roundedRect(W - 80, y + 6, 66, 12, 2, 2, "F");
+  setTextColor(doc, WHITE);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.text(opts.audienceLabel, W - 47, y + 11, { align: "center" });
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.text(`n = ${opts.audienceCount.toLocaleString()}`, W - 47, y + 15.5, { align: "center" });
+  y += 48;
+
+  // Description
+  if (opts.productDescription) {
+    y = sectionTitle(doc, "Description", y);
+    setTextColor(doc, GREY_DARK);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const descLines = doc.splitTextToSize(opts.productDescription, W - 28);
+    doc.text(descLines, 14, y);
+    y += descLines.length * 5 + 8;
+  }
+
+  // Summary of what was generated
+  const generatedTabs = Object.keys(opts.outputs).filter((k) => opts.outputs[k]);
+  if (generatedTabs.length || opts.mediaPlan) {
+    y = sectionTitle(doc, "Generated Outputs", y);
+    const tabNames = [
+      ...generatedTabs.map((t) => TAB_LABELS[t] || t),
+      ...(opts.mediaPlan ? ["Media Plan"] : []),
+    ];
+    tabNames.forEach((name) => {
+      setFill(doc, BRAND);
+      doc.roundedRect(14, y, W - 28, 6, 1, 1, "F");
+      setTextColor(doc, WHITE);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.text(`✓  ${name}`, 20, y + 4.2);
+      y += 8;
+    });
+  }
+
+  page++;
+
+  // Strategy pages
+  for (const [type, output] of Object.entries(opts.outputs)) {
+    if (output) addStrategyOutput(type, output);
+  }
+
+  // Media Plan page
+  if (opts.mediaPlan) {
+    doc.addPage();
+    addHeader(doc, opts.productName || "Orchestration Report", "Media Plan");
+    addFooter(doc, page);
+    let my = 30;
+
+    // KPI row
+    const kpis = [
+      { label: "Total Budget", value: fmt$(opts.mediaPlan.totalBudget) },
+      { label: "Impressions", value: fmtN(opts.mediaPlan.totalImpressions) },
+      { label: "Reach", value: fmtN(opts.mediaPlan.addressableReach) },
+      { label: "Avg Frequency", value: opts.mediaPlan.avgFrequency.toFixed(1) + "×" },
+      { label: "Blended CPM", value: fmt$(opts.mediaPlan.blendedCpm) },
+    ];
+    const kpiW = (W - 28) / kpis.length;
+    kpis.forEach((k, i) => {
+      const kx = 14 + i * kpiW;
+      setFill(doc, BRAND_LIGHT);
+      doc.roundedRect(kx, my, kpiW - 2, 14, 2, 2, "F");
+      setTextColor(doc, BRAND);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(k.value, kx + kpiW / 2 - 1, my + 7, { align: "center" });
+      setTextColor(doc, GREY_MID);
+      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "normal");
+      doc.text(k.label.toUpperCase(), kx + kpiW / 2 - 1, my + 12, { align: "center" });
+    });
+    my += 22;
+
+    // Platform allocation table
+    my = sectionTitle(doc, "Platform Allocation", my);
+    autoTable(doc, {
+      startY: my,
+      head: [["Platform", "Alloc %", "Budget", "Impressions", "Reach", "Freq", "CPM", "Clicks", "CPC"]],
+      body: opts.mediaPlan.platforms.map((p) => [
+        `${p.icon} ${p.platform}`,
+        p.allocationPct.toFixed(1) + "%",
+        fmt$(p.spend),
+        fmtN(p.impressions),
+        fmtN(p.reach),
+        p.frequency.toFixed(1) + "×",
+        fmt$(p.cpm),
+        fmtN(p.clicks),
+        fmt$(p.cpc),
+      ]),
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: hexToRgb(BRAND), textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7 },
+      alternateRowStyles: { fillColor: [249, 249, 249] },
+      margin: { left: 14, right: 14 },
+    });
+
+    // Rationale
+    if (opts.rationale) {
+      const tbl = (doc as any).lastAutoTable;
+      let ry = (tbl?.finalY ?? my + 40) + 8;
+      ry = sectionTitle(doc, "Strategic Rationale", ry);
+      setTextColor(doc, GREY_DARK);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      const rLines = doc.splitTextToSize(opts.rationale, W - 28);
+      doc.text(rLines, 14, ry);
+    }
+
+    page++;
+  }
+
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const slug = (opts.productName || "orchestration").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  doc.save(`Orchestration_${slug}_${dateTag}.pdf`);
 }

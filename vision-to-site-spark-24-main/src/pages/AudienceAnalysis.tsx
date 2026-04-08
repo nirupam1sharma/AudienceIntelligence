@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import AudienceBuilder from "@/components/audience-analysis/AudienceBuilder";
 import IntelligenceReport from "@/components/intelligence/IntelligenceReport";
 import CrosstabStudio from "@/components/crosstab/CrosstabStudio";
+import ConceptTesting from "@/components/concept-testing/ConceptTesting";
+import Orchestration from "@/components/orchestration/Orchestration";
 
 // ─── Sidebar modules ────────────────────────────────────────────
 const MODULES = [
@@ -89,6 +91,14 @@ const AudienceAnalysis = () => {
               </div>
               <CrosstabStudio />
             </div>
+          ) : activeModule === "orchestration" ? (
+            <div className="p-8">
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold text-hero-foreground">Orchestration</h1>
+                <p className="text-hero-muted text-sm mt-1">Generate brand strategy, communications plan, ad tactics, and media plan</p>
+              </div>
+              <Orchestration />
+            </div>
           ) : (
             <div className="p-8 max-w-5xl">
               <div className="mb-6">
@@ -104,10 +114,12 @@ const AudienceAnalysis = () => {
                 </p>
               </div>
 
-              {activeModule === "audience-builder" && <AudienceBuilder />}
-              {activeModule !== "audience-builder" && (
+                  {activeModule === "audience-builder" && <AudienceBuilder />}
+              {activeModule === "concept-testing" && <ConceptTesting />}
+              {!["audience-builder", "concept-testing"].includes(activeModule) && (
                 <ComingSoon label={`${module.label} module coming soon`} />
               )}
+
 
             </div>
           )}
