@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 220 30% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 10%;
+
+    --primary: 168 100% 14%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 168 20% 94%;
+    --secondary-foreground: 168 100% 14%;
+
+    --muted: 168 15% 92%;
+    --muted-foreground: 168 10% 50%;
+
+    --accent: 42 88% 54%;
+    --accent-foreground: 0 0% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 168 18% 88%;
+    --input: 168 18% 88%;
+    --ring: 168 100% 14%;
+
+    --radius: 0.75rem;
+
+    /* Custom tokens — Big Village brand (light) */
+    --hero-bg: 0 0% 100%;
+    --hero-foreground: 168 100% 14%;
+    --hero-muted: 168 12% 45%;
+    --glow-primary: 168 100% 14%;
+    --glow-accent: 42 88% 44%;
+    --surface-dark: 168 20% 96%;
+    --surface-card: 0 0% 100%;
+    --surface-card-border: 168 18% 88%;
+    --flow-gradient-start: 168 100% 14%;
+    --flow-gradient-end: 42 88% 44%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 152 48% 5%;
+    --foreground: 0 0% 97%;
+    --card: 152 36% 11%;
+    --card-foreground: 0 0% 97%;
+    --popover: 152 36% 11%;
+    --popover-foreground: 0 0% 97%;
+    --primary: 168 100% 14%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 168 26% 18%;
+    --secondary-foreground: 0 0% 97%;
+    --muted: 168 26% 18%;
+    --muted-foreground: 168 15% 62%;
+    --accent: 42 88% 54%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 97%;
+    --border: 168 26% 18%;
+    --input: 168 26% 18%;
+    --ring: 168 100% 14%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--glow-primary)), hsl(var(--glow-accent) / 0.9));
+  }
+  .bg-hero {
+    background-color: hsl(var(--hero-bg));
+    color: hsl(var(--hero-foreground));
+  }
+  .bg-surface-dark {
+    background-color: hsl(var(--surface-dark));
+  }
+  .bg-surface-card {
+    background-color: hsl(var(--surface-card));
+    border: 1px solid hsl(var(--surface-card-border));
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .text-hero-muted {
+    color: hsl(var(--hero-muted));
+  }
+  .glow-primary {
+    box-shadow: 0 4px 24px hsl(var(--glow-primary) / 0.2);
+  }
+  .glow-accent {
+    box-shadow: 0 4px 24px hsl(var(--glow-accent) / 0.2);
+  }
+  .border-glow {
+    border-color: hsl(var(--glow-primary) / 0.3);
+  }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+@keyframes flowPulse {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.7s ease-out both;
+}
+.animate-fade-in-up-delay-1 {
+  animation: fadeInUp 0.7s ease-out 0.15s both;
+}
+.animate-fade-in-up-delay-2 {
+  animation: fadeInUp 0.7s ease-out 0.3s both;
+}
+.animate-fade-in-up-delay-3 {
+  animation: fadeInUp 0.7s ease-out 0.45s both;
+}
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+.animate-flow-pulse {
+  background-size: 200% 100%;
+  animation: flowPulse 3s linear infinite;
+}

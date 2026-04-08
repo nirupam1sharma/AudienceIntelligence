@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs ls:*)",
+      "Bash(npm --version)",
+      "Bash(brew list:*)",
+      "Read(//usr/local/bin/**)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(grep -E \"^\\(node|npm|npx|bun\\)$\")",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(/Users/nirupamsharma/.nvm/versions/node/v22.14.0/bin/npx tsc:*)",
+      "Bash(ls /usr/local/bin/node /opt/homebrew/bin/node ~/.nvm/versions/node/*/bin/node)",
+      "Bash(/opt/homebrew/bin/node --version)",
+      "Bash(/opt/homebrew/bin/npx tsc:*)",
+      "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npx tsc --noEmit)",
+      "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npm install jspdf html2canvas)",
+      "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npm install jspdf-autotable)",
+      "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npx vite build)"
+    ]
+  }
+}
