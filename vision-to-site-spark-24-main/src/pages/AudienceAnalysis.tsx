@@ -12,6 +12,8 @@ import IntelligenceReport from "@/components/intelligence/IntelligenceReport";
 import CrosstabStudio from "@/components/crosstab/CrosstabStudio";
 import ConceptTesting from "@/components/concept-testing/ConceptTesting";
 import Orchestration from "@/components/orchestration/Orchestration";
+import FocusGroup from "@/components/focus-group/FocusGroup";
+import Monitor from "@/components/monitor/Monitor";
 
 // ─── Sidebar modules ────────────────────────────────────────────
 const MODULES = [
@@ -127,6 +129,22 @@ const AudienceAnalysis = () => {
               </div>
               <CrosstabStudio />
             </div>
+          ) : activeModule === "focus-group" ? (
+            <div className="p-8">
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold text-hero-foreground">Focus Group Studio</h1>
+                <p className="text-hero-muted text-sm mt-1">Run AI-simulated focus groups with synthetic participants drawn from your audience</p>
+              </div>
+              <FocusGroup />
+            </div>
+          ) : activeModule === "monitor" ? (
+            <div className="p-8">
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold text-hero-foreground">Brand Monitor</h1>
+                <p className="text-hero-muted text-sm mt-1">Track brand awareness, sentiment, and competitive positioning across online sources</p>
+              </div>
+              <Monitor />
+            </div>
           ) : activeModule === "orchestration" ? (
             <div className="p-8">
               <div className="mb-6">
@@ -149,7 +167,7 @@ const AudienceAnalysis = () => {
               </div>
               {activeModule === "audience-builder" && <AudienceBuilder />}
               {activeModule === "concept-testing" && <ConceptTesting />}
-              {!["audience-builder", "concept-testing"].includes(activeModule) && (
+              {!["audience-builder", "concept-testing"].includes(activeModule) && !["focus-group", "monitor"].includes(activeModule) && (
                 <ComingSoon label={`${module.label} module coming soon`} />
               )}
             </div>

@@ -16,7 +16,8 @@
       "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npx tsc --noEmit)",
       "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npm install jspdf html2canvas)",
       "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npm install jspdf-autotable)",
-      "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npx vite build)"
+      "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npx vite build)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:50111/)"
     ]
   }
 }

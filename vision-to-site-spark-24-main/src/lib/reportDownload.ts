@@ -4,6 +4,8 @@ import type { AudienceRecord } from "./audienceData";
 import type { Segment } from "./segmentData";
 import type { ConceptResult, ConceptType } from "./conceptTestTypes";
 import type { StrategyOutput, MediaPlanResult } from "./orchestrationTypes";
+import type { Participant, Message, SessionSummary, DiscussionType } from "./focusGroupTypes";
+import type { MonitorSource, MonitorResult } from "./monitorTypes";
 
 // Brand colour
 const BRAND = "#004638";
@@ -14,6 +16,11 @@ const GREY_LIGHT = "#dddddd";
 const WHITE = "#ffffff";
 
 // ─── Helpers ───────────────────────────────────────────────────────
+
+/** Strip any character outside Latin-1 (0x00-0xFF) so jsPDF Helvetica renders cleanly */
+function sanitize(text: string): string {
+  return text.replace(/[^\x00-\xFF]/g, "").trim();
+}
 
 function pct(n: number, total: number) {
   if (total === 0) return 0;
@@ -965,9 +972,14 @@ export function downloadOrchestrationPdf(opts: OrchestrationExportOpts) {
     addFooter(doc, page);
     let y = 30;
 
-    // Headline banner
+    // Headline banner — height adapts to wrapped summary text
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const sumLines = doc.splitTextToSize(output.summary, W - 36);
+    const lineH = 4.5;
+    const bannerH = 14 + sumLines.length * lineH;   // 14 = headline row + top/bottom padding
     setFill(doc, BRAND_LIGHT);
-    doc.roundedRect(14, y, W - 28, 18, 2, 2, "F");
+    doc.roundedRect(14, y, W - 28, bannerH, 2, 2, "F");
     setTextColor(doc, BRAND);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -975,9 +987,8 @@ export function downloadOrchestrationPdf(opts: OrchestrationExportOpts) {
     setTextColor(doc, GREY_DARK);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    const sumLines = doc.splitTextToSize(output.summary, W - 36);
     doc.text(sumLines, W / 2, y + 13, { align: "center" });
-    y += 24;
+    y += bannerH + 6;
 
     // Sections in 2-col grid
     const colW = (W - 28 - 4) / 2;
@@ -1007,7 +1018,7 @@ export function downloadOrchestrationPdf(opts: OrchestrationExportOpts) {
 
       if (sec.bullets?.length) {
         sec.bullets.forEach((b) => {
-          const bLines = doc.splitTextToSize(`• ${b}`, colW - 9);
+          const bLines = doc.splitTextToSize(`- ${sanitize(b)}`, colW - 9);
           // page overflow check
           if (sy + bLines.length * 4 > pageH(doc) - 20) {
             page++;
@@ -1061,7 +1072,7 @@ export function downloadOrchestrationPdf(opts: OrchestrationExportOpts) {
   setTextColor(doc, WHITE);
   doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
-  doc.text(opts.audienceLabel, W - 47, y + 11, { align: "center" });
+  doc.text(sanitize(opts.audienceLabel), W - 47, y + 11, { align: "center" });
   doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
   doc.text(`n = ${opts.audienceCount.toLocaleString()}`, W - 47, y + 15.5, { align: "center" });
@@ -1092,7 +1103,7 @@ export function downloadOrchestrationPdf(opts: OrchestrationExportOpts) {
       setTextColor(doc, WHITE);
       doc.setFontSize(7.5);
       doc.setFont("helvetica", "normal");
-      doc.text(`✓  ${name}`, 20, y + 4.2);
+      doc.text(`+  ${sanitize(name)}`, 20, y + 4.2);
       y += 8;
     });
   }
@@ -1141,7 +1152,7 @@ export function downloadOrchestrationPdf(opts: OrchestrationExportOpts) {
       startY: my,
       head: [["Platform", "Alloc %", "Budget", "Impressions", "Reach", "Freq", "CPM", "Clicks", "CPC"]],
       body: opts.mediaPlan.platforms.map((p) => [
-        `${p.icon} ${p.platform}`,
+        p.platform,
         p.allocationPct.toFixed(1) + "%",
         fmt$(p.spend),
         fmtN(p.impressions),
@@ -1175,4 +1186,289 @@ export function downloadOrchestrationPdf(opts: OrchestrationExportOpts) {
   const dateTag = new Date().toISOString().slice(0, 10);
   const slug = (opts.productName || "orchestration").replace(/[^a-z0-9]/gi, "_").toLowerCase();
   doc.save(`Orchestration_${slug}_${dateTag}.pdf`);
+}
+
+// ─── Focus Group PDF ───────────────────────────────────────────────
+
+const DTYPE_LABELS: Record<string, string> = {
+  "concept-reaction": "Concept Reaction",
+  "message-testing": "Message Testing",
+  "category-exploration": "Category Exploration",
+  "brand-perception": "Brand Perception",
+};
+
+export interface FocusGroupExportOpts {
+  discussionType: DiscussionType;
+  topic: string;
+  audienceLabel: string;
+  audienceCount: number;
+  participants: Participant[];
+  messages: Message[];
+  summary?: SessionSummary;
+}
+
+export function downloadFocusGroupPdf(opts: FocusGroupExportOpts) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const W = pageW(doc);
+  let page = 1;
+
+  const typeLabel = DTYPE_LABELS[opts.discussionType] || opts.discussionType;
+
+  // Page 1: Cover
+  addHeader(doc, "Focus Group Report", typeLabel);
+  addFooter(doc, page);
+  let y = 30;
+
+  // Topic banner
+  setFill(doc, BRAND_LIGHT);
+  doc.roundedRect(14, y, W - 28, 20, 2, 2, "F");
+  setTextColor(doc, BRAND);
+  doc.setFontSize(9); doc.setFont("helvetica", "bold");
+  doc.text("DISCUSSION TOPIC", 20, y + 6);
+  setTextColor(doc, GREY_DARK);
+  doc.setFontSize(9); doc.setFont("helvetica", "normal");
+  const topicLines = doc.splitTextToSize(opts.topic, W - 48);
+  doc.text(topicLines, 20, y + 12);
+  // Audience badge
+  setFill(doc, BRAND);
+  doc.roundedRect(W - 76, y + 4, 62, 12, 2, 2, "F");
+  setTextColor(doc, WHITE);
+  doc.setFontSize(7); doc.setFont("helvetica", "bold");
+  doc.text(sanitize(opts.audienceLabel), W - 45, y + 9, { align: "center" });
+  doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+  doc.text(`n = ${opts.audienceCount.toLocaleString()}`, W - 45, y + 13.5, { align: "center" });
+  y += 28;
+
+  // Participants table
+  y = sectionTitle(doc, "Participants", y);
+  autoTable(doc, {
+    startY: y,
+    head: [["Name", "Gender", "Age Group", "Profile Summary"]],
+    body: opts.participants.map((p) => [
+      p.name, p.gender, p.age_group,
+      p.profile.split("\n").slice(2, 4).join(" · ").substring(0, 80),
+    ]),
+    styles: { fontSize: 7, cellPadding: 2 },
+    headStyles: { fillColor: hexToRgb(BRAND), textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7 },
+    alternateRowStyles: { fillColor: [249, 249, 249] },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable?.finalY + 8 || y + 40;
+
+  // Summary (if exists)
+  if (opts.summary) {
+    if (y > pageH(doc) - 60) { page++; doc.addPage(); addHeader(doc, "Focus Group Report", typeLabel); addFooter(doc, page); y = 30; }
+    y = sectionTitle(doc, "Overall Sentiment", y);
+    setTextColor(doc, GREY_DARK);
+    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    const sentLines = doc.splitTextToSize(opts.summary.overallSentiment, W - 28);
+    doc.text(sentLines, 14, y);
+    y += sentLines.length * 5 + 8;
+
+    // Key themes
+    y = sectionTitle(doc, "Key Themes", y);
+    opts.summary.keyThemes.forEach((theme, i) => {
+      if (y > pageH(doc) - 20) { page++; doc.addPage(); addHeader(doc, "Focus Group Report", typeLabel); addFooter(doc, page); y = 30; }
+      setFill(doc, BRAND_LIGHT);
+      doc.roundedRect(14, y, W - 28, 7, 1, 1, "F");
+      setTextColor(doc, BRAND);
+      doc.setFontSize(7); doc.setFont("helvetica", "bold");
+      doc.text(`${i + 1}`, 19, y + 4.8);
+      setTextColor(doc, GREY_DARK);
+      doc.setFont("helvetica", "normal");
+      doc.text(theme, 25, y + 4.8);
+      y += 9;
+    });
+    y += 4;
+
+    // Key quotes
+    if (opts.summary.keyQuotes?.length) {
+      if (y > pageH(doc) - 40) { page++; doc.addPage(); addHeader(doc, "Focus Group Report", typeLabel); addFooter(doc, page); y = 30; }
+      y = sectionTitle(doc, "Key Quotes", y);
+      opts.summary.keyQuotes.forEach((q) => {
+        if (y > pageH(doc) - 25) { page++; doc.addPage(); addHeader(doc, "Focus Group Report", typeLabel); addFooter(doc, page); y = 30; }
+        const qLines = doc.splitTextToSize(`"${q.quote}"`, W - 36);
+        setFill(doc, "#f9f9f9");
+        doc.roundedRect(14, y, W - 28, qLines.length * 4.5 + 8, 1, 1, "F");
+        setTextColor(doc, GREY_MID);
+        doc.setFontSize(7.5); doc.setFont("helvetica", "italic");
+        doc.text(qLines, 20, y + 4.5);
+        setTextColor(doc, BRAND);
+        doc.setFontSize(7); doc.setFont("helvetica", "bold");
+        doc.text(`— ${q.participant}`, W - 16, y + qLines.length * 4.5 + 2, { align: "right" });
+        y += qLines.length * 4.5 + 11;
+      });
+    }
+
+    // Recommendations
+    if (opts.summary.recommendations?.length) {
+      if (y > pageH(doc) - 40) { page++; doc.addPage(); addHeader(doc, "Focus Group Report", typeLabel); addFooter(doc, page); y = 30; }
+      y = sectionTitle(doc, "Recommendations", y);
+      opts.summary.recommendations.forEach((r) => {
+        if (y > pageH(doc) - 15) { page++; doc.addPage(); addHeader(doc, "Focus Group Report", typeLabel); addFooter(doc, page); y = 30; }
+        const rLines = doc.splitTextToSize(`-  ${sanitize(r)}`, W - 28);
+        setTextColor(doc, GREY_DARK);
+        doc.setFontSize(7.5); doc.setFont("helvetica", "normal");
+        doc.text(rLines, 14, y);
+        y += rLines.length * 5 + 3;
+      });
+    }
+  }
+
+  // Transcript page(s)
+  const transcript = opts.messages.filter((m) => m.role !== "system");
+  if (transcript.length) {
+    page++; doc.addPage();
+    addHeader(doc, "Focus Group Report", "Full Transcript");
+    addFooter(doc, page);
+    y = 30;
+    transcript.forEach((msg) => {
+      const speaker = msg.role === "moderator" ? "MODERATOR" : msg.participantName ?? "Participant";
+      const text = `${speaker}: ${msg.content}`;
+      const lines = doc.splitTextToSize(text, W - 28);
+      if (y + lines.length * 4.5 > pageH(doc) - 18) {
+        page++; doc.addPage();
+        addHeader(doc, "Focus Group Report", "Full Transcript");
+        addFooter(doc, page);
+        y = 30;
+      }
+      setTextColor(doc, msg.role === "moderator" ? BRAND : GREY_DARK);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", msg.role === "moderator" ? "bold" : "normal");
+      doc.text(lines, 14, y);
+      y += lines.length * 4.5 + 3;
+    });
+  }
+
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const slug = (opts.topic || "focus_group").replace(/[^a-z0-9]/gi, "_").toLowerCase().slice(0, 30);
+  doc.save(`FocusGroup_${slug}_${dateTag}.pdf`);
+}
+
+// ─── Monitor PDF ──────────────────────────────────────────────────
+
+export interface MonitorExportOpts {
+  brand: string;
+  competitors: string;
+  topics: string;
+  sources: MonitorSource[];
+  audienceLabel: string;
+  audienceCount: number;
+  result: MonitorResult;
+}
+
+export function downloadMonitorPdf(opts: MonitorExportOpts) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const W = pageW(doc);
+  let page = 1;
+
+  addHeader(doc, `Brand Monitor — ${opts.brand}`, "All Respondents");
+  addFooter(doc, page);
+  let y = 30;
+
+  // Run info
+  setFill(doc, BRAND_LIGHT);
+  doc.roundedRect(14, y, W - 28, 16, 2, 2, "F");
+  setTextColor(doc, BRAND);
+  doc.setFontSize(8); doc.setFont("helvetica", "bold");
+  doc.text(opts.brand, 20, y + 6);
+  setTextColor(doc, GREY_MID);
+  doc.setFontSize(7); doc.setFont("helvetica", "normal");
+  if (opts.competitors) doc.text(`vs ${opts.competitors}`, 20, y + 11);
+  doc.text(`Sources: ${opts.sources.join(", ")}`, W - 16, y + 6, { align: "right" });
+  doc.text(new Date().toLocaleDateString("en-US", { dateStyle: "long" }), W - 16, y + 11, { align: "right" });
+  y += 22;
+
+  // Scorecard
+  y = sectionTitle(doc, "Scorecard", y);
+  const kpis = [
+    { label: "Awareness", value: opts.result.scorecard.awareness },
+    { label: "Sentiment", value: opts.result.scorecard.sentiment },
+    { label: "Reputation", value: opts.result.scorecard.reputation },
+    { label: "Share of Voice", value: opts.result.scorecard.shareOfVoice, suffix: "%" },
+  ];
+  const kpiW = (W - 28) / kpis.length;
+  kpis.forEach((k, i) => {
+    const kx = 14 + i * kpiW;
+    setFill(doc, BRAND_LIGHT);
+    doc.roundedRect(kx, y, kpiW - 2, 14, 2, 2, "F");
+    setTextColor(doc, BRAND);
+    doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    doc.text(`${k.value}${k.suffix || ""}`, kx + kpiW / 2 - 1, y + 7, { align: "center" });
+    setTextColor(doc, GREY_MID);
+    doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+    doc.text(k.label.toUpperCase(), kx + kpiW / 2 - 1, y + 12, { align: "center" });
+  });
+  y += 22;
+
+  // Sentiment summary
+  y = sectionTitle(doc, `Brand Sentiment — ${opts.result.sentimentLabel.toUpperCase()}`, y);
+  setTextColor(doc, GREY_DARK);
+  doc.setFontSize(8); doc.setFont("helvetica", "normal");
+  const sentLines = doc.splitTextToSize(opts.result.sentimentSummary, W - 28);
+  doc.text(sentLines, 14, y);
+  y += sentLines.length * 5 + 8;
+
+  // Key themes
+  y = sectionTitle(doc, "Key Themes", y);
+  opts.result.keyThemes.forEach((t, i) => {
+    if (y > pageH(doc) - 20) { page++; doc.addPage(); addHeader(doc, `Brand Monitor — ${opts.brand}`, "All Respondents"); addFooter(doc, page); y = 30; }
+    const tLines = doc.splitTextToSize(`${i + 1}.  ${t}`, W - 28);
+    setTextColor(doc, GREY_DARK);
+    doc.setFontSize(7.5); doc.setFont("helvetica", "normal");
+    doc.text(tLines, 14, y);
+    y += tLines.length * 4.5 + 2;
+  });
+  y += 4;
+
+  // Competitive positioning
+  if (y > pageH(doc) - 50) { page++; doc.addPage(); addHeader(doc, `Brand Monitor — ${opts.brand}`, "All Respondents"); addFooter(doc, page); y = 30; }
+  y = sectionTitle(doc, "Competitive Positioning", y);
+  setTextColor(doc, GREY_DARK);
+  doc.setFontSize(7.5); doc.setFont("helvetica", "normal");
+  const compLines = doc.splitTextToSize(opts.result.competitivePositioning, W - 28);
+  doc.text(compLines, 14, y);
+  y += compLines.length * 5 + 8;
+
+  // Verbatims
+  if (opts.result.verbatims?.length) {
+    if (y > pageH(doc) - 40) { page++; doc.addPage(); addHeader(doc, `Brand Monitor — ${opts.brand}`, "All Respondents"); addFooter(doc, page); y = 30; }
+    y = sectionTitle(doc, "Consumer Verbatims", y);
+    autoTable(doc, {
+      startY: y,
+      head: [["Sentiment", "Source", "Quote"]],
+      body: opts.result.verbatims.map((v) => [
+        v.sentiment.toUpperCase(), v.source, `"${sanitize(v.quote)}"`,
+      ]),
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: hexToRgb(BRAND), textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7 },
+      columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 22 } },
+      alternateRowStyles: { fillColor: [249, 249, 249] },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable?.finalY + 8 || y + 40;
+  }
+
+  // Watch items
+  if (opts.result.watchItems?.length) {
+    if (y > pageH(doc) - 30) { page++; doc.addPage(); addHeader(doc, `Brand Monitor — ${opts.brand}`, "All Respondents"); addFooter(doc, page); y = 30; }
+    y = sectionTitle(doc, "Watch Items", y);
+    opts.result.watchItems.forEach((w) => {
+      if (y > pageH(doc) - 20) { page++; doc.addPage(); addHeader(doc, `Brand Monitor — ${opts.brand}`, "All Respondents"); addFooter(doc, page); y = 30; }
+      setFill(doc, "#fff5f5");
+      const wLines = doc.splitTextToSize(w.description, W - 50);
+      doc.roundedRect(14, y, W - 28, 7 + wLines.length * 4.5, 1, 1, "F");
+      setTextColor(doc, "#e53e3e");
+      doc.setFontSize(7); doc.setFont("helvetica", "bold");
+      doc.text(`[${w.severity.toUpperCase()}]  ${w.title}`, 18, y + 4.5);
+      setTextColor(doc, GREY_MID);
+      doc.setFont("helvetica", "normal");
+      doc.text(wLines, 18, y + 9);
+      y += 7 + wLines.length * 4.5 + 4;
+    });
+  }
+
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const slug = (opts.brand || "monitor").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  doc.save(`Monitor_${slug}_${dateTag}.pdf`);
 }
