@@ -4,7 +4,7 @@ import LoginGate from "@/components/LoginGate";
 import {
   Users, BarChart2, FlaskConical, MessageSquare,
   TableProperties, GitFork, Zap, Activity,
-  HexagonIcon,
+  HexagonIcon, Menu, X, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AudienceBuilder from "@/components/audience-analysis/AudienceBuilder";
@@ -25,7 +25,6 @@ const MODULES = [
   { id: "monitor",           label: "Monitor",            icon: Activity,         num: "08" },
 ];
 
-
 // ─── Placeholder for other modules ──────────────────────────────
 const ComingSoon = ({ label }: { label: string }) => (
   <div className="flex flex-col items-center justify-center py-32 text-center gap-3">
@@ -38,17 +37,39 @@ const ComingSoon = ({ label }: { label: string }) => (
 // ─── Page ────────────────────────────────────────────────────────
 const AudienceAnalysis = () => {
   const [activeModule, setActiveModule] = useState("audience-builder");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const module = MODULES.find((m) => m.id === activeModule)!;
 
   return (
     <LoginGate>
     <div className="min-h-screen bg-hero">
       <Navbar />
-      <div className="pt-16 flex h-[calc(100vh-4rem)]">
+      <div className="pt-20 flex h-[calc(100vh-5rem)]">
 
         {/* Left Sidebar */}
-        <aside className="w-52 flex-shrink-0 bg-hero border-r border-surface-card-border overflow-y-auto">
-          <nav className="py-4">
+        <aside className={cn(
+          "flex-shrink-0 bg-hero border-r border-surface-card-border overflow-y-auto transition-all duration-300 flex flex-col",
+          sidebarOpen ? "w-64" : "w-16"
+        )}>
+          {/* Hamburger toggle */}
+          <div className={cn(
+            "flex items-center border-b border-surface-card-border py-3 flex-shrink-0",
+            sidebarOpen ? "px-4 justify-between" : "px-3 justify-center"
+          )}>
+            {sidebarOpen && (
+              <span className="text-xs font-bold text-hero-muted uppercase tracking-widest">Modules</span>
+            )}
+            <button
+              onClick={() => setSidebarOpen(o => !o)}
+              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-dark/50 text-hero-muted hover:text-hero-foreground transition-colors"
+              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
+
+          {/* Nav items */}
+          <nav className="py-3 flex-1">
             {MODULES.map((m) => {
               const Icon = m.icon;
               const active = m.id === activeModule;
@@ -56,21 +77,36 @@ const AudienceAnalysis = () => {
                 <button
                   key={m.id}
                   onClick={() => setActiveModule(m.id)}
+                  title={!sidebarOpen ? m.label : undefined}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors text-left",
+                    "w-full flex items-center gap-3 transition-colors text-left relative group",
+                    sidebarOpen ? "px-4 py-3" : "px-0 py-3 justify-center",
                     active
-                      ? "bg-glow-primary/10 text-glow-primary border-r-2 border-glow-primary"
+                      ? "bg-[#004638]/10 text-[#004638] border-r-2 border-[#004638]"
                       : "text-hero-muted hover:text-hero-foreground hover:bg-surface-dark/40"
                   )}
                 >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  <span className="flex-1 font-medium">{m.label}</span>
-                  <span className={cn(
-                    "text-[10px] font-mono",
-                    active ? "text-glow-accent" : "text-hero-muted/50"
-                  )}>
-                    {m.num}
-                  </span>
+                  <Icon className={cn("flex-shrink-0", sidebarOpen ? "h-5 w-5" : "h-5 w-5")} />
+
+                  {sidebarOpen && (
+                    <>
+                      <span className="flex-1 font-semibold text-base">{m.label}</span>
+                      <span className={cn(
+                        "text-xs font-mono",
+                        active ? "text-[#004638]/60" : "text-hero-muted/40"
+                      )}>
+                        {m.num}
+                      </span>
+                    </>
+                  )}
+
+                  {/* Tooltip when collapsed */}
+                  {!sidebarOpen && (
+                    <div className="absolute left-full ml-2 px-2.5 py-1.5 rounded-md bg-surface-card border border-surface-card-border text-xs font-semibold text-hero-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
+                      <span className="text-hero-muted/50 mr-1.5">{m.num}</span>{m.label}
+                      <ChevronRight className="inline h-3 w-3 ml-1 text-hero-muted/40" />
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -107,20 +143,15 @@ const AudienceAnalysis = () => {
                   {activeModule === "audience-builder" && "Define your target audience using segments or custom criteria"}
                   {activeModule === "concept-testing" && "Test concepts and messaging with your audience"}
                   {activeModule === "focus-group" && "Run qualitative research with targeted groups"}
-                  {activeModule === "crosstab-studio" && "Analyze relationships across audience dimensions"}
-                  {activeModule === "orchestration" && "Automate and orchestrate audience workflows"}
                   {activeModule === "activation" && "Activate audiences across channels and platforms"}
                   {activeModule === "monitor" && "Track audience changes and campaign performance"}
                 </p>
               </div>
-
-                  {activeModule === "audience-builder" && <AudienceBuilder />}
+              {activeModule === "audience-builder" && <AudienceBuilder />}
               {activeModule === "concept-testing" && <ConceptTesting />}
               {!["audience-builder", "concept-testing"].includes(activeModule) && (
                 <ComingSoon label={`${module.label} module coming soon`} />
               )}
-
-
             </div>
           )}
         </main>

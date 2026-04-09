@@ -1,7 +1,10 @@
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
+  const navigate = useNavigate();
+
   return (
     <section className="relative bg-hero min-h-screen flex items-center overflow-hidden">
       {/* Background glow effects */}
@@ -26,13 +29,11 @@ const HeroSection = () => {
             A unified, AI-guided analytics platform that helps teams define, understand, size, report on, and activate audiences — all through natural language.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up-delay-3">
-            <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary px-8 py-6 text-base">
+          <div className="flex justify-center animate-fade-in-up-delay-3">
+            <Button size="lg" onClick={() => navigate("/contact")}
+              className="bg-[#004638] hover:bg-[#004638]/90 text-white glow-primary px-8 py-6 text-base">
               Request a Demo
               <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button size="lg" variant="outline" className="border-surface-card-border text-hero-foreground hover:bg-surface-card px-8 py-6 text-base">
-              Read the Vision
             </Button>
           </div>
         </div>
@@ -53,11 +54,11 @@ const FlowSteps = () => {
     <div className="flex items-center justify-center gap-2 md:gap-4 flex-wrap">
       {steps.map((step, i) => (
         <div key={step} className="flex items-center gap-2 md:gap-4">
-          <div className="px-4 py-2.5 md:px-6 md:py-3 rounded-lg bg-surface-card border border-surface-card-border text-sm md:text-base font-medium text-hero-foreground hover:border-glow transition-colors duration-300">
+          <div className="px-4 py-2.5 md:px-6 md:py-3 rounded-lg bg-[#004638]/10 border border-[#004638]/30 text-sm md:text-base font-semibold text-[#004638] hover:bg-[#004638]/20 hover:border-[#004638]/50 transition-colors duration-300">
             {step}
           </div>
           {i < steps.length - 1 && (
-            <ArrowRight className="h-4 w-4 text-glow-primary shrink-0" />
+            <ArrowRight className="h-4 w-4 text-[#004638] shrink-0" />
           )}
         </div>
       ))}
