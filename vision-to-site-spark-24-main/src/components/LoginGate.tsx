@@ -4,8 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 const SESSION_KEY = "bv_auth";
-const VALID_USER = import.meta.env.VITE_AUTH_USERNAME as string;
-const VALID_PASS = import.meta.env.VITE_AUTH_PASSWORD as string;
+const VALID_USER = import.meta.env.VITE_AUTH_USERNAME || "bigvillage";
+const VALID_PASS = import.meta.env.VITE_AUTH_PASSWORD || "audience2026";
 
 export function isAuthenticated(): boolean {
   return sessionStorage.getItem(SESSION_KEY) === "1";
