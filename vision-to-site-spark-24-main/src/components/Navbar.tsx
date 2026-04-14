@@ -1,18 +1,10 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { isAuthenticated, logout } from "@/components/LoginGate";
 import { cn } from "@/lib/utils";
 
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const authed = isAuthenticated();
-
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
 
   const navLinks = [
     { label: "Home", to: "/" },
@@ -56,15 +48,6 @@ const Navbar = () => {
 
         {/* Right actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {authed && (
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              className="border-surface-card-border text-hero-muted hover:text-destructive hover:border-destructive/40 gap-1.5"
-            >
-              <LogOut className="h-4 w-4" /> Sign Out
-            </Button>
-          )}
           <Button
             className="bg-[#004638] hover:bg-[#004638]/90 text-white font-semibold text-base px-6 h-10"
             onClick={() => navigate("/contact")}

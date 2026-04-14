@@ -1,6 +1,5 @@
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
-import LoginGate from "@/components/LoginGate";
 import {
   Users, BarChart2, FlaskConical, MessageSquare,
   TableProperties, GitFork, Activity,
@@ -42,7 +41,6 @@ const AudienceAnalysis = () => {
   const module = MODULES.find((m) => m.id === activeModule)!;
 
   return (
-    <LoginGate>
     <div className="min-h-screen bg-hero">
       <Navbar />
       <div className="pt-20 flex h-[calc(100vh-5rem)]">
@@ -173,7 +171,6 @@ const AudienceAnalysis = () => {
         </main>
       </div>
     </div>
-    </LoginGate>
   );
 };
 
