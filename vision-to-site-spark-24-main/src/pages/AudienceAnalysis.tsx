@@ -3,7 +3,7 @@ import Navbar from "@/components/Navbar";
 import LoginGate from "@/components/LoginGate";
 import {
   Users, BarChart2, FlaskConical, MessageSquare,
-  TableProperties, GitFork, Zap, Activity,
+  TableProperties, GitFork, Activity,
   HexagonIcon, Menu, X, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,8 +23,7 @@ const MODULES = [
   { id: "focus-group",       label: "Focus Group",        icon: MessageSquare,    num: "04" },
   { id: "crosstab-studio",   label: "Cross-Tab Studio",   icon: TableProperties,  num: "05" },
   { id: "orchestration",     label: "Orchestration",      icon: GitFork,          num: "06" },
-  { id: "activation",        label: "Activation",         icon: Zap,              num: "07" },
-  { id: "monitor",           label: "Monitor",            icon: Activity,         num: "08" },
+  { id: "monitor",           label: "Monitor",            icon: Activity,         num: "07" },
 ];
 
 // ─── Placeholder for other modules ──────────────────────────────
@@ -161,7 +160,6 @@ const AudienceAnalysis = () => {
                   {activeModule === "audience-builder" && "Define your target audience using segments or custom criteria"}
                   {activeModule === "concept-testing" && "Test concepts and messaging with your audience"}
                   {activeModule === "focus-group" && "Run qualitative research with targeted groups"}
-                  {activeModule === "activation" && "Activate audiences across channels and platforms"}
                   {activeModule === "monitor" && "Track audience changes and campaign performance"}
                 </p>
               </div>

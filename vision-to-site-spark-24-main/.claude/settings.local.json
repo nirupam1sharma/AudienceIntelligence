@@ -17,7 +17,11 @@
       "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npm install jspdf html2canvas)",
       "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npm install jspdf-autotable)",
       "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npx vite build)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:50111/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:50111/)",
+      "Bash(npm run:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174/)",
+      "Bash(curl -s http://localhost:5174/audience-analysis -o /dev/null -w \"%{http_code}\")"
     ]
   }
 }
