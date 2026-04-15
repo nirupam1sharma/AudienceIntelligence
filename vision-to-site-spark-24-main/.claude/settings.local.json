@@ -21,7 +21,17 @@
       "Bash(npm run:*)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174/)",
-      "Bash(curl -s http://localhost:5174/audience-analysis -o /dev/null -w \"%{http_code}\")"
+      "Bash(curl -s http://localhost:5174/audience-analysis -o /dev/null -w \"%{http_code}\")",
+      "Bash(grep -v '^--$')",
+      "Read(//Users/nirupamsharma/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/ec3b4156-1825-4d9f-ba65-8dbf7056cf37/4f02efb9-49b4-4f97-bed7-e9fff710394f/skills/docx/**)",
+      "Bash(node -e \"const {Document}=require\\('docx'\\); console.log\\('docx ok'\\);\")",
+      "Bash(npm root:*)",
+      "Bash(node -e \"const {Document}=require\\('/opt/homebrew/lib/node_modules/docx'\\); console.log\\('docx ok'\\);\")",
+      "Bash(node make_proposal.js)",
+      "Bash(python scripts/office/validate.py /Users/nirupamsharma/Downloads/AudienceIntelligence_ProjectProposal.docx)",
+      "Bash(python scripts/office/validate.py /Users/nirupamsharma/Downloads/AudienceIntelligence_ProjectProposal_v2.docx)",
+      "mcp__Desktop_Commander__list_directory",
+      "mcp__Desktop_Commander__read_file"
     ]
   }
 }

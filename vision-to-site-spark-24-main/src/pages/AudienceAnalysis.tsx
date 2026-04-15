@@ -2,7 +2,7 @@ import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import {
   Users, BarChart2, FlaskConical, MessageSquare,
-  TableProperties, GitFork, Activity,
+  TableProperties, GitFork, Activity, ClipboardList,
   HexagonIcon, Menu, X, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,16 +13,18 @@ import ConceptTesting from "@/components/concept-testing/ConceptTesting";
 import Orchestration from "@/components/orchestration/Orchestration";
 import FocusGroup from "@/components/focus-group/FocusGroup";
 import Monitor from "@/components/monitor/Monitor";
+import SurveySimulator from "@/components/survey-simulator/SurveySimulator";
 
 // ─── Sidebar modules ────────────────────────────────────────────
 const MODULES = [
-  { id: "audience-builder",  label: "Audience Builder",  icon: Users,           num: "01" },
-  { id: "intelligence",      label: "Intelligence",       icon: BarChart2,        num: "02" },
-  { id: "concept-testing",   label: "Concept Testing",    icon: FlaskConical,     num: "03" },
-  { id: "focus-group",       label: "Focus Group",        icon: MessageSquare,    num: "04" },
-  { id: "crosstab-studio",   label: "Cross-Tab Studio",   icon: TableProperties,  num: "05" },
-  { id: "orchestration",     label: "Orchestration",      icon: GitFork,          num: "06" },
-  { id: "monitor",           label: "Monitor",            icon: Activity,         num: "07" },
+  { id: "audience-builder",   label: "Audience Builder",  icon: Users,           num: "01" },
+  { id: "intelligence",       label: "Intelligence",       icon: BarChart2,        num: "02" },
+  { id: "concept-testing",    label: "Concept Testing",    icon: FlaskConical,     num: "03" },
+  { id: "focus-group",        label: "Focus Group",        icon: MessageSquare,    num: "04" },
+  { id: "crosstab-studio",    label: "Cross-Tab Studio",   icon: TableProperties,  num: "05" },
+  { id: "orchestration",      label: "Orchestration",      icon: GitFork,          num: "06" },
+  { id: "monitor",            label: "Monitor",            icon: Activity,         num: "07" },
+  { id: "survey-simulator",   label: "Survey Simulator",   icon: ClipboardList,    num: "08" },
 ];
 
 // ─── Placeholder for other modules ──────────────────────────────
@@ -149,6 +151,14 @@ const AudienceAnalysis = () => {
                 <p className="text-hero-muted text-sm mt-1">Generate brand strategy, communications plan, ad tactics, and media plan</p>
               </div>
               <Orchestration />
+            </div>
+          ) : activeModule === "survey-simulator" ? (
+            <div className="p-8 max-w-3xl">
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold text-hero-foreground">Survey Simulator</h1>
+                <p className="text-hero-muted text-sm mt-1">Field a custom survey with your audience and analyse results</p>
+              </div>
+              <SurveySimulator />
             </div>
           ) : (
             <div className="p-8 max-w-5xl">
