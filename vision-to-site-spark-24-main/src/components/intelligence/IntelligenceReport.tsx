@@ -375,26 +375,6 @@ const IntelligenceReport = ({ embedded = false }: IntelligenceReportProps) => {
         </div>
       </div>
 
-      {/* Delete API Key */}
-      {apiKey && (
-        <div className="fixed bottom-4 left-4 z-50">
-          {showDeleteConfirm ? (
-            <div className="flex items-center gap-2 bg-surface-card/90 backdrop-blur border border-destructive/40 rounded-lg px-3 py-2">
-              <span className="text-xs text-hero-foreground">Delete API key?</span>
-              <Button size="sm" variant="ghost" onClick={handleDeleteKey}
-                className="h-6 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive">Yes</Button>
-              <Button size="sm" variant="ghost" onClick={() => setShowDeleteConfirm(false)}
-                className="h-6 px-2 text-xs text-hero-muted hover:text-hero-foreground">No</Button>
-            </div>
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(true)}
-              className="bg-surface-card/80 backdrop-blur border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive gap-1.5 text-xs">
-              <Trash2 className="h-3.5 w-3.5" /> Delete API Key
-            </Button>
-          )}
-        </div>
-      )}
-
       {/* API Key Dialog */}
       <Dialog open={showKeyDialog} onOpenChange={setShowKeyDialog}>
         <DialogContent className="bg-surface-card border-surface-card-border text-hero-foreground sm:max-w-md">
