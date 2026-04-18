@@ -25,22 +25,22 @@ const Contact = () => {
       <Navbar />
       <div className="pt-20">
         {/* Header */}
-        <div className="bg-hero border-b border-surface-card-border py-16 text-center">
-          <div className="container mx-auto px-6">
-            <span className="inline-block px-4 py-1.5 rounded-full text-sm font-medium bg-surface-card border border-glow mb-6 text-hero-muted">
+        <div className="bg-hero border-b border-surface-card-border py-10 sm:py-16 text-center">
+          <div className="container mx-auto px-4 sm:px-6">
+            <span className="inline-block px-3 py-1.5 sm:px-4 rounded-full text-xs sm:text-sm font-medium bg-surface-card border border-glow mb-5 sm:mb-6 text-hero-muted">
               Get in Touch
             </span>
-            <h1 className="text-4xl md:text-5xl font-bold text-hero-foreground mb-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-hero-foreground mb-3 sm:mb-4">
               Contact Us
             </h1>
-            <p className="text-hero-muted text-lg max-w-2xl mx-auto leading-relaxed">
+            <p className="text-hero-muted text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
               Whether you're ready to request a demo, ask a question, or explore a partnership — we'd love to hear from you.
             </p>
           </div>
         </div>
 
-        <div className="container mx-auto px-6 py-16">
-          <div className="max-w-6xl mx-auto grid lg:grid-cols-3 gap-12">
+        <div className="container mx-auto px-4 sm:px-6 py-10 sm:py-16">
+          <div className="max-w-6xl mx-auto grid lg:grid-cols-3 gap-8 sm:gap-12">
 
             {/* Left: Contact info */}
             <div className="space-y-8">
@@ -96,7 +96,7 @@ const Contact = () => {
 
             {/* Right: Form */}
             <div className="lg:col-span-2">
-              <div className="rounded-2xl bg-surface-card border border-surface-card-border p-8">
+              <div className="rounded-2xl bg-surface-card border border-surface-card-border p-4 sm:p-8">
                 {submitted ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-glow-primary/10 border border-glow-primary/30 flex items-center justify-center">

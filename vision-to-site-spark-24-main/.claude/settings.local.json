@@ -31,7 +31,12 @@
       "Bash(python scripts/office/validate.py /Users/nirupamsharma/Downloads/AudienceIntelligence_ProjectProposal.docx)",
       "Bash(python scripts/office/validate.py /Users/nirupamsharma/Downloads/AudienceIntelligence_ProjectProposal_v2.docx)",
       "mcp__Desktop_Commander__list_directory",
-      "mcp__Desktop_Commander__read_file"
+      "mcp__Desktop_Commander__read_file",
+      "Bash(node make_rfp.js)",
+      "Bash(npm list:*)",
+      "Bash(NODE_PATH=$\\(npm root -g\\) node make_rfp.js)",
+      "Bash(python '/Users/nirupamsharma/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/ec3b4156-1825-4d9f-ba65-8dbf7056cf37/4f02efb9-49b4-4f97-bed7-e9fff710394f/skills/docx/scripts/office/validate.py' /Users/nirupamsharma/Downloads/AudienceIntelligence_RFP_CompleteBuild.docx)",
+      "Bash(python '/Users/nirupamsharma/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/ec3b4156-1825-4d9f-ba65-8dbf7056cf37/4f02efb9-49b4-4f97-bed7-e9fff710394f/skills/docx/scripts/office/validate.py' /Users/nirupamsharma/Downloads/AudienceIntelligence_RFP_BuildOnPrototype.docx)"
     ]
   }
 }

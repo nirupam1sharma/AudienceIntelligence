@@ -35,28 +35,28 @@ const features = [
 
 const FeaturesSection = () => {
   return (
-    <section className="bg-hero py-24 relative">
+    <section className="bg-hero py-16 sm:py-24 relative">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-glow-primary/[0.02] to-transparent" />
-      <div className="container mx-auto px-6 relative z-10">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-hero-foreground mb-4">
+      <div className="container mx-auto px-4 sm:px-6 relative z-10">
+        <div className="text-center mb-10 sm:mb-16">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-hero-foreground mb-3 sm:mb-4">
             Core Capabilities
           </h2>
-          <p className="text-hero-muted text-lg max-w-2xl mx-auto">
+          <p className="text-hero-muted text-base sm:text-lg max-w-2xl mx-auto">
             Six integrated capabilities that take you from business question to decisive action.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-6xl mx-auto">
           {features.map((feature) => (
             <div
               key={feature.title}
-              className="group p-6 rounded-xl bg-surface-card border border-surface-card-border hover:border-glow transition-all duration-300 hover:glow-primary"
+              className="group p-4 sm:p-6 rounded-xl bg-surface-card border border-surface-card-border hover:border-glow transition-all duration-300 hover:glow-primary"
             >
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                <feature.icon className="h-6 w-6 text-glow-primary" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-primary/20 transition-colors">
+                <feature.icon className="h-5 w-5 sm:h-6 sm:w-6 text-glow-primary" />
               </div>
-              <h3 className="text-lg font-semibold text-hero-foreground mb-2">
+              <h3 className="text-base sm:text-lg font-semibold text-hero-foreground mb-2">
                 {feature.title}
               </h3>
               <p className="text-hero-muted text-sm leading-relaxed">
