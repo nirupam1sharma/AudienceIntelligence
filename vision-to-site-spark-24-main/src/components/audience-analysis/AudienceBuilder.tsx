@@ -21,7 +21,6 @@ import {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const ICON_OPTIONS = ["👥", "💼", "🏃", "💰", "📱", "🎮", "✈️", "🎵", "🍳", "📚", "🏡", "💊", "🐾", "⚽", "🎨", "🛍️"];
 const COLOR_OPTIONS = ["#004638", "#F5A825", "#3B82F6", "#8B5CF6", "#EC4899", "#10B981", "#F97316", "#EF4444"];
 
 // ─── Universe projection ──────────────────────────────────────────────────────
@@ -128,7 +127,6 @@ const AudienceBuilder = ({ onAudienceChange, onViewIntelligence }: AudienceBuild
   const [editingSegment, setEditingSegment] = useState<Segment | null>(null);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
-  const [icon, setIcon] = useState("👥");
   const [color, setColor] = useState("#004638");
   const [method, setMethod] = useState<"nl" | "rules">("nl");
   const [nlText, setNlText] = useState("");
@@ -176,7 +174,6 @@ const AudienceBuilder = ({ onAudienceChange, onViewIntelligence }: AudienceBuild
     setEditingSegment(null);
     setName("");
     setDesc("");
-    setIcon("👥");
     setColor("#004638");
     setMethod("nl");
     setNlText("");
@@ -188,7 +185,6 @@ const AudienceBuilder = ({ onAudienceChange, onViewIntelligence }: AudienceBuild
     setEditingSegment(seg);
     setName(seg.name);
     setDesc(seg.desc || "");
-    setIcon(seg.icon || "👥");
     setColor(seg.color || "#004638");
     setMethod(seg.method || "nl");
     setNlText(seg.nlText || "");
@@ -240,7 +236,7 @@ const AudienceBuilder = ({ onAudienceChange, onViewIntelligence }: AudienceBuild
       id: editingSegment?.id || `seg_${Date.now()}`,
       name: name.trim(),
       desc: desc.trim() || "Custom audience",
-      icon, color, method,
+      icon: "◎", color, method,
       filters: f,
       nlText: method === "nl" ? nlText : undefined,
     };
@@ -335,27 +331,6 @@ const AudienceBuilder = ({ onAudienceChange, onViewIntelligence }: AudienceBuild
                   placeholder="Short description (optional)"
                   className="bg-surface-dark border-surface-card-border text-hero-foreground placeholder:text-hero-muted text-sm"
                 />
-              </div>
-            </div>
-
-            {/* Icon picker */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-hero-muted uppercase tracking-wider">Icon</label>
-              <div className="flex gap-2 flex-wrap">
-                {ICON_OPTIONS.map((ic) => (
-                  <button
-                    key={ic}
-                    onClick={() => setIcon(ic)}
-                    className={cn(
-                      "text-xl w-9 h-9 rounded-lg border transition-colors flex items-center justify-center",
-                      icon === ic
-                        ? "border-glow-primary bg-glow-primary/10"
-                        : "border-surface-card-border hover:border-glow-primary/40"
-                    )}
-                  >
-                    {ic}
-                  </button>
-                ))}
               </div>
             </div>
 

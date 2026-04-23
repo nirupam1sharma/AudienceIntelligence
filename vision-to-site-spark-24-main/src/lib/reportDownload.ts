@@ -17,9 +17,14 @@ const WHITE = "#ffffff";
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
-/** Strip any character outside Latin-1 (0x00-0xFF) so jsPDF Helvetica renders cleanly */
+/** Strip emoji and any character outside Latin-1 (0x00-0xFF) so jsPDF Helvetica renders cleanly */
 function sanitize(text: string): string {
-  return text.replace(/[^\x00-\xFF]/g, "").trim();
+  return text
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")   // emoji block (most pictographs)
+    .replace(/[\u2600-\u27BF]/g, "")            // misc symbols, dingbats
+    .replace(/[^\x00-\xFF]/g, "")               // anything else outside Latin-1
+    .replace(/\s+/g, " ")                        // collapse any double-spaces left behind
+    .trim();
 }
 
 function pct(n: number, total: number) {
@@ -69,6 +74,8 @@ function pageW(doc: jsPDF) { return doc.internal.pageSize.getWidth(); }
 function pageH(doc: jsPDF) { return doc.internal.pageSize.getHeight(); }
 
 function addHeader(doc: jsPDF, title: string, subtitle: string) {
+  const safeTitle    = sanitize(title);
+  const safeSubtitle = sanitize(subtitle);
   setFill(doc, BRAND);
   doc.rect(0, 0, pageW(doc), 22, "F");
   setTextColor(doc, WHITE);
@@ -81,10 +88,10 @@ function addHeader(doc: jsPDF, title: string, subtitle: string) {
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   const titleX = pageW(doc) / 2;
-  doc.text(title, titleX, 9, { align: "center" });
+  doc.text(safeTitle, titleX, 9, { align: "center" });
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text(subtitle, titleX, 15, { align: "center" });
+  doc.text(safeSubtitle, titleX, 15, { align: "center" });
   // date top-right
   const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   doc.text(dateStr, pageW(doc) - 14, 15, { align: "right" });
@@ -220,7 +227,8 @@ export interface ReportOptions {
 }
 
 export function downloadReport(opts: ReportOptions) {
-  const { data, allData, audienceLabel, appliedQuery, crosstab } = opts;
+  const { data, allData, appliedQuery, crosstab } = opts;
+  const audienceLabel = sanitize(opts.audienceLabel); // strip emoji/non-Latin-1 for jsPDF
   const n = data.length;
   const total = allData.length;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
