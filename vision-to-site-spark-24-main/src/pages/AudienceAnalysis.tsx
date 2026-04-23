@@ -19,13 +19,13 @@ import SurveySimulator from "@/components/survey-simulator/SurveySimulator";
 
 // ─── Sidebar modules ────────────────────────────────────────────
 const MODULES = [
-  { id: "audience-builder",  label: "Audience Builder",  icon: Users,          num: "01" },
-  { id: "intelligence",      label: "Audience Profile",  icon: BarChart2,       num: "02" },
-  { id: "concept-testing",   label: "Concept Testing",   icon: FlaskConical,    num: "03" },
-  { id: "focus-group",       label: "Focus Groups",      icon: MessageSquare,   num: "04" },
-  { id: "survey-simulator",  label: "Surveys",           icon: ClipboardList,   num: "05" },
-  { id: "orchestration",     label: "Orchestration",     icon: GitFork,         num: "06" },
-  { id: "monitor",           label: "Monitor",           icon: Activity,        num: "07" },
+  { id: "audience-builder",  label: "Audience Builder",  icon: Users,          num: "01", mvp: true  },
+  { id: "intelligence",      label: "Audience Profile",  icon: BarChart2,       num: "02", mvp: true  },
+  { id: "concept-testing",   label: "Concept Testing",   icon: FlaskConical,    num: "03", mvp: true  },
+  { id: "focus-group",       label: "Focus Groups",      icon: MessageSquare,   num: "04", mvp: true  },
+  { id: "survey-simulator",  label: "Surveys",           icon: ClipboardList,   num: "05", mvp: true },
+  { id: "orchestration",     label: "Orchestration",     icon: GitFork,         num: "06", mvp: true },
+  { id: "monitor",           label: "Monitor",           icon: Activity,        num: "07", mvp: true },
 ];
 
 // ─── Placeholder for other modules ──────────────────────────────
@@ -79,38 +79,58 @@ const AudienceAnalysis = () => {
   // Shared sidebar nav content
   const SidebarNav = ({ expanded, onSelect }: { expanded: boolean; onSelect: (id: string) => void }) => (
     <nav className="py-3 flex-1">
-      {MODULES.map((m) => {
+      {MODULES.map((m, idx) => {
         const Icon = m.icon;
         const active = m.id === activeModule;
+        // Insert a divider before the first non-MVP module
+        const showDivider = !m.mvp && MODULES[idx - 1]?.mvp;
         return (
-          <button
-            key={m.id}
-            onClick={() => onSelect(m.id)}
-            title={!expanded ? m.label : undefined}
-            className={cn(
-              "w-full flex items-center gap-3 transition-colors text-left relative group",
-              expanded ? "px-4 py-3" : "px-0 py-3 justify-center",
-              active
-                ? "bg-[#004638]/10 text-[#004638] border-r-2 border-[#004638]"
-                : "text-hero-muted hover:text-hero-foreground hover:bg-surface-dark/40"
-            )}
-          >
-            <Icon className="flex-shrink-0 h-5 w-5" />
-            {expanded && (
-              <>
-                <span className="flex-1 font-semibold text-base">{m.label}</span>
-                <span className={cn("text-xs font-mono", active ? "text-[#004638]/60" : "text-hero-muted/40")}>
-                  {m.num}
-                </span>
-              </>
-            )}
-            {!expanded && (
-              <div className="absolute left-full ml-2 px-2.5 py-1.5 rounded-md bg-surface-card border border-surface-card-border text-xs font-semibold text-hero-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
-                <span className="text-hero-muted/50 mr-1.5">{m.num}</span>{m.label}
-                <ChevronRight className="inline h-3 w-3 ml-1 text-hero-muted/40" />
+          <div key={m.id}>
+            {showDivider && (
+              <div className={cn("mx-3 my-2", expanded ? "" : "mx-2")}>
+                <div className="border-t border-surface-card-border" />
+                {expanded && (
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-hero-muted/40 px-1 mt-1.5 block">
+                    Coming Soon
+                  </span>
+                )}
               </div>
             )}
-          </button>
+            <button
+              onClick={() => onSelect(m.id)}
+              title={!expanded ? `${m.label}${!m.mvp ? " (coming soon)" : ""}` : undefined}
+              className={cn(
+                "w-full flex items-center gap-3 transition-colors text-left relative group",
+                expanded ? "px-4 py-3" : "px-0 py-3 justify-center",
+                !m.mvp && "opacity-45 cursor-default pointer-events-none",
+                active
+                  ? "bg-[#004638]/10 text-[#004638] border-r-2 border-[#004638]"
+                  : "text-hero-muted hover:text-hero-foreground hover:bg-surface-dark/40"
+              )}
+            >
+              <Icon className="flex-shrink-0 h-5 w-5" />
+              {expanded && (
+                <>
+                  <span className="flex-1 font-semibold text-base">{m.label}</span>
+                  {m.mvp ? (
+                    <span className={cn("text-xs font-mono", active ? "text-[#004638]/60" : "text-hero-muted/40")}>
+                      {m.num}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-surface-dark border border-surface-card-border text-hero-muted/50 uppercase tracking-wide">
+                      Soon
+                    </span>
+                  )}
+                </>
+              )}
+              {!expanded && (
+                <div className="absolute left-full ml-2 px-2.5 py-1.5 rounded-md bg-surface-card border border-surface-card-border text-xs font-semibold text-hero-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
+                  <span className="text-hero-muted/50 mr-1.5">{m.num}</span>{m.label}
+                  {!m.mvp && <span className="ml-1.5 text-hero-muted/50">(soon)</span>}
+                </div>
+              )}
+            </button>
+          </div>
         );
       })}
     </nav>

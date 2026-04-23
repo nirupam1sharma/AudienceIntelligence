@@ -66,6 +66,13 @@ const IntelligenceReport = ({ embedded = false, initialSegmentId }: Intelligence
   const [segments, setSegments] = useState<Segment[]>([]);
   const [activeSegment, setActiveSegment] = useState<Segment | null>(null);
 
+  // ── Synthesis snapshot ─────────────────────────────────────────
+  // Holds the frozen data the synthesis was last computed from.
+  // Only updates when the user explicitly clicks "Regenerate".
+  const [synthesisData, setSynthesisData] = useState<AudienceRecord[]>([]);
+  const [synthesisDirty, setSynthesisDirty] = useState(false);
+  const synthesisSeeded = useRef(false);
+
   useEffect(() => {
     setSegments(loadSegments());
   }, []);
@@ -178,6 +185,21 @@ const IntelligenceReport = ({ embedded = false, initialSegmentId }: Intelligence
   }, [allData, activeSegment]);
 
   const filtered = useMemo(() => applyFilters(segmentBaseData, filters), [segmentBaseData, filters]);
+
+  // Seed synthesis once on first non-empty result
+  useEffect(() => {
+    if (!synthesisSeeded.current && filtered.length > 0) {
+      setSynthesisData(filtered);
+      synthesisSeeded.current = true;
+    }
+  }, [filtered]);
+
+  // Mark dirty whenever filters change after seeding
+  useEffect(() => {
+    if (synthesisSeeded.current) {
+      setSynthesisDirty(true);
+    }
+  }, [filtered]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -485,12 +507,18 @@ const IntelligenceReport = ({ embedded = false, initialSegmentId }: Intelligence
               <>
                 {/* ── Synthesis Panel ──────────────────────────────── */}
                 <SynthesisPanel
-                  filtered={filtered}
+                  synthesisData={synthesisData}
+                  liveCount={filtered.length}
                   total={allData.length}
                   activeSegment={activeSegment}
                   nlpApplied={nlpApplied}
                   activeSources={activeSources}
                   uploadedFiles={uploadedFiles}
+                  isDirty={synthesisDirty}
+                  onRegenerate={() => {
+                    setSynthesisData(filtered);
+                    setSynthesisDirty(false);
+                  }}
                 />
                 <AudienceInsights data={filtered} total={allData.length} />
                 <AudienceReporting data={filtered} allData={allData} segments={segments} />
@@ -545,12 +573,15 @@ const IntelligenceReport = ({ embedded = false, initialSegmentId }: Intelligence
 // ─── Synthesis Panel ─────────────────────────────────────────────────────────
 
 interface SynthesisPanelProps {
-  filtered: AudienceRecord[];
+  synthesisData: AudienceRecord[];
+  liveCount: number;
   total: number;
   activeSegment: { name: string; icon: string } | null;
   nlpApplied: string | null;
   activeSources: Set<string>;
   uploadedFiles: File[];
+  isDirty: boolean;
+  onRegenerate: () => void;
 }
 
 // ─── Real data-driven synthesis ──────────────────────────────────────────────
@@ -676,12 +707,12 @@ function computeSynthesis(data: AudienceRecord[]): string[] {
 }
 
 const SynthesisPanel = ({
-  filtered, total, activeSegment, nlpApplied, activeSources, uploadedFiles,
+  synthesisData, liveCount, total, activeSegment, nlpApplied, activeSources, uploadedFiles, isDirty, onRegenerate,
 }: SynthesisPanelProps) => {
   const [expanded, setExpanded] = useState(true);
-  const pct = total > 0 ? ((filtered.length / total) * 100).toFixed(1) : "0";
-  const reach = projectedReach(filtered.length, total);
-  const items = computeSynthesis(filtered);
+  const pct = total > 0 ? ((synthesisData.length / total) * 100).toFixed(1) : "0";
+  const reach = projectedReach(synthesisData.length, total);
+  const items = computeSynthesis(synthesisData);
   const contextLabel = activeSegment
     ? `${activeSegment.icon} ${activeSegment.name}`
     : nlpApplied
@@ -712,6 +743,29 @@ const SynthesisPanel = ({
         <span className={cn("text-hero-muted transition-transform text-xs", expanded ? "rotate-90" : "")}>▶</span>
       </button>
 
+      {isDirty && (
+        <div className="flex items-center justify-between gap-3 px-5 py-2.5 bg-amber-500/10 border-t border-amber-500/20">
+          <span className="text-xs text-amber-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+            Filters changed — synthesis may be out of date
+            {liveCount !== synthesisData.length && (
+              <span className="ml-1 opacity-70">
+                (showing {liveCount.toLocaleString()} vs {synthesisData.length.toLocaleString()} when last generated)
+              </span>
+            )}
+          </span>
+          <button
+            onClick={onRegenerate}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25 transition-colors shrink-0"
+          >
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/>
+            </svg>
+            Regenerate Synthesis
+          </button>
+        </div>
+      )}
+
       {expanded && (
         <div className="px-5 pb-5 space-y-3 border-t border-glow-primary/15">
           <div className="mt-3 mb-3 flex items-center gap-4 flex-wrap">
@@ -720,7 +774,10 @@ const SynthesisPanel = ({
               <div className="text-xs text-hero-muted">projected reach · {pct}% of 600M universe</div>
             </div>
             <div className="text-xs text-hero-muted/60 border-l border-surface-card-border pl-4">
-              n={filtered.length.toLocaleString()} survey respondents
+              n={synthesisData.length.toLocaleString()} survey respondents
+              {isDirty && liveCount !== synthesisData.length && (
+                <span className="ml-1 text-amber-400/70">(live: {liveCount.toLocaleString()})</span>
+              )}
             </div>
           </div>
           <p className="text-xs text-hero-muted mb-2 uppercase tracking-wider font-semibold">Key Findings</p>
