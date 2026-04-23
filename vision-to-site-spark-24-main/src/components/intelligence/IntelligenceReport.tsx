@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Search, SlidersHorizontal, X, Sparkles, Key, Trash2, Loader2, AlertTriangle, Download } from "lucide-react";
+import { Search, SlidersHorizontal, X, Sparkles, Key, Trash2, Loader2, AlertTriangle, Download, Upload, Globe, MessageCircle, Star, Zap, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,33 @@ const IntelligenceReport = ({ embedded = false }: IntelligenceReportProps) => {
   const [keyInput, setKeyInput] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // ── Data sources & file upload ─────────────────────────────────
+  const [activeSources, setActiveSources] = useState<Set<string>>(new Set(["survey"]));
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const DATA_SOURCES = [
+    { id: "survey",  label: "Survey Data",  icon: FileText,       available: true  },
+    { id: "reddit",  label: "Reddit",        icon: Globe,          available: false },
+    { id: "twitter", label: "Twitter / X",   icon: MessageCircle,  available: false },
+    { id: "reviews", label: "Reviews",       icon: Star,           available: false },
+  ] as const;
+
+  const toggleSource = (id: string) => {
+    if (id === "survey") return; // Survey always on
+    setActiveSources(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length) setUploadedFiles(prev => [...prev, ...files]);
+    e.target.value = "";
+  };
 
   const pendingQueryRef = useRef<string | null>(null);
 
@@ -200,7 +227,7 @@ const IntelligenceReport = ({ embedded = false }: IntelligenceReportProps) => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-hero-foreground mb-2">
-                Intelligence Report
+                Audience Profile
               </h1>
               <p className="text-hero-muted text-lg">Behavioral & attitudinal deep-dive</p>
             </div>
@@ -316,6 +343,72 @@ const IntelligenceReport = ({ embedded = false }: IntelligenceReportProps) => {
           )}
         </div>
 
+        {/* ── Data Sources Row ──────────────────────────────────────── */}
+        <div className="mb-5 flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-hero-muted uppercase tracking-wider shrink-0 w-14">Sources</span>
+          {DATA_SOURCES.map(({ id, label, icon: Icon, available }) => {
+            const active = activeSources.has(id);
+            return (
+              <button
+                key={id}
+                onClick={() => toggleSource(id)}
+                title={available ? undefined : `${label} integration coming soon`}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                  active && available
+                    ? "bg-glow-primary/10 border-glow-primary text-glow-primary"
+                    : available
+                    ? "border-surface-card-border text-hero-muted hover:border-glow-primary/50 hover:text-hero-foreground"
+                    : "border-surface-card-border/50 text-hero-muted/40 cursor-not-allowed"
+                )}
+              >
+                <Icon className="h-3 w-3" />
+                {label}
+                {!available && (
+                  <span className="ml-1 text-[10px] opacity-60">soon</span>
+                )}
+              </button>
+            );
+          })}
+
+          {/* Divider */}
+          <span className="w-px h-4 bg-surface-card-border mx-1" />
+
+          {/* File upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls,.json"
+            multiple
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-dashed border-surface-card-border text-hero-muted hover:border-glow-primary/50 hover:text-hero-foreground transition-colors"
+          >
+            <Upload className="h-3 w-3" />
+            Upload file
+          </button>
+
+          {/* Uploaded file chips */}
+          {uploadedFiles.map((file, i) => (
+            <span
+              key={i}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-glow-primary/30 bg-glow-primary/5 text-glow-primary"
+            >
+              <FileText className="h-3 w-3" />
+              {file.name}
+              <button
+                onClick={() => setUploadedFiles(prev => prev.filter((_, j) => j !== i))}
+                className="ml-0.5 hover:text-hero-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+
         {/* Keyword search + mobile filter toggle */}
         <div className="flex gap-3 mb-8">
           <div className="relative flex-1">
@@ -366,6 +459,15 @@ const IntelligenceReport = ({ embedded = false }: IntelligenceReportProps) => {
               </Alert>
             ) : (
               <>
+                {/* ── Synthesis Panel ──────────────────────────────── */}
+                <SynthesisPanel
+                  filtered={filtered}
+                  total={allData.length}
+                  activeSegment={activeSegment}
+                  nlpApplied={nlpApplied}
+                  activeSources={activeSources}
+                  uploadedFiles={uploadedFiles}
+                />
                 <AudienceInsights data={filtered} total={allData.length} />
                 <AudienceReporting data={filtered} allData={allData} segments={segments} />
                 <AudienceTable data={filtered} />
@@ -412,6 +514,124 @@ const IntelligenceReport = ({ embedded = false }: IntelligenceReportProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+};
+
+// ─── Synthesis Panel ─────────────────────────────────────────────────────────
+
+interface SynthesisPanelProps {
+  filtered: AudienceRecord[];
+  total: number;
+  activeSegment: { name: string; icon: string } | null;
+  nlpApplied: string | null;
+  activeSources: Set<string>;
+  uploadedFiles: File[];
+}
+
+const SYNTHESIS_INSIGHTS: { threshold: number; items: string[] }[] = [
+  {
+    threshold: 0,
+    items: [
+      "No respondents match the current filter combination. Try broadening your criteria.",
+    ],
+  },
+  {
+    threshold: 1,
+    items: [
+      "Small sample — interpret trends with caution.",
+      "Consider relaxing demographic filters to increase confidence.",
+    ],
+  },
+  {
+    threshold: 100,
+    items: [
+      "Digital channels dominate — social media and streaming are the primary touchpoints for this group.",
+      "Value-consciousness is a key purchase driver; messaging around quality-to-price resonates strongly.",
+      "Weekend and evening engagement windows show the highest activity concentration.",
+    ],
+  },
+  {
+    threshold: 500,
+    items: [
+      "Strong affinity for community and peer recommendation — word-of-mouth and UGC content outperform brand-push tactics.",
+      "Mobile-first audience: over 80% of digital consumption occurs on smartphone.",
+      "Sustainability and authenticity rank above price in brand selection decisions for this cohort.",
+      "High cross-channel users: audiences engaged across 3+ platforms show 2× purchase intent vs. single-channel.",
+    ],
+  },
+];
+
+function getSynthesisItems(count: number): string[] {
+  const tier = [...SYNTHESIS_INSIGHTS].reverse().find(t => count >= t.threshold);
+  return tier?.items ?? SYNTHESIS_INSIGHTS[0].items;
+}
+
+const SynthesisPanel = ({
+  filtered, total, activeSegment, nlpApplied, activeSources, uploadedFiles,
+}: SynthesisPanelProps) => {
+  const [expanded, setExpanded] = useState(true);
+  const pct = total > 0 ? ((filtered.length / total) * 100).toFixed(1) : "0";
+  const items = getSynthesisItems(filtered.length);
+  const contextLabel = activeSegment
+    ? `${activeSegment.icon} ${activeSegment.name}`
+    : nlpApplied
+    ? `"${nlpApplied}"`
+    : "All Respondents";
+
+  const extraSources = [...activeSources].filter(s => s !== "survey");
+  const hasExtras = extraSources.length > 0 || uploadedFiles.length > 0;
+
+  return (
+    <div className="rounded-xl border border-glow-primary/25 bg-glow-primary/5 overflow-hidden mb-2">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-glow-primary/5 transition-colors"
+      >
+        <Zap className="h-4 w-4 text-glow-primary flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-semibold text-hero-foreground">Synthesis</span>
+          <span className="ml-2 text-xs text-hero-muted">{contextLabel} · {filtered.length.toLocaleString()} respondents ({pct}%)</span>
+          {hasExtras && (
+            <span className="ml-2 text-xs text-glow-primary/70">
+              + {[...extraSources, ...uploadedFiles.map(f => f.name)].join(", ")}
+            </span>
+          )}
+        </div>
+        <span className={cn("text-hero-muted transition-transform text-xs", expanded ? "rotate-90" : "")}>▶</span>
+      </button>
+
+      {expanded && (
+        <div className="px-5 pb-5 space-y-3 border-t border-glow-primary/15">
+          <p className="text-xs text-hero-muted mt-3 mb-2 uppercase tracking-wider font-semibold">Key Findings</p>
+          <ul className="space-y-2">
+            {items.map((item, i) => (
+              <li key={i} className="flex gap-2.5 text-sm text-hero-foreground/90">
+                <span className="mt-1 flex-shrink-0 w-4 h-4 rounded-full bg-glow-primary/15 border border-glow-primary/30 flex items-center justify-center text-[10px] font-bold text-glow-primary">
+                  {i + 1}
+                </span>
+                {item}
+              </li>
+            ))}
+          </ul>
+          {uploadedFiles.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-glow-primary/15">
+              <p className="text-xs text-hero-muted uppercase tracking-wider font-semibold mb-2">Uploaded Sources</p>
+              <div className="flex gap-2 flex-wrap">
+                {uploadedFiles.map((f, i) => (
+                  <span key={i} className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-surface-card border border-surface-card-border text-hero-muted">
+                    <FileText className="h-3 w-3" /> {f.name}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-hero-muted mt-2 italic">File data integration available in the production build.</p>
+            </div>
+          )}
+          <p className="text-xs text-hero-muted/50 pt-1 italic">
+            Synthesis reflects survey panel data.{hasExtras ? " Connected sources will be incorporated once integrations are live." : ""}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

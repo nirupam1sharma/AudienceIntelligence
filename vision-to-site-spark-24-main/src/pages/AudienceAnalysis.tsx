@@ -20,12 +20,12 @@ import SurveySimulator from "@/components/survey-simulator/SurveySimulator";
 // ─── Sidebar modules ────────────────────────────────────────────
 const MODULES = [
   { id: "audience-builder",  label: "Audience Builder",  icon: Users,          num: "01" },
-  { id: "intelligence",      label: "Intelligence",       icon: BarChart2,       num: "02" },
-  { id: "concept-testing",   label: "Concept Testing",    icon: FlaskConical,    num: "03" },
-  { id: "focus-group",       label: "Focus Group",        icon: MessageSquare,   num: "04" },
-  { id: "orchestration",     label: "Orchestration",      icon: GitFork,         num: "05" },
-  { id: "monitor",           label: "Monitor",            icon: Activity,        num: "06" },
-  { id: "survey-simulator",  label: "Survey Simulator",   icon: ClipboardList,   num: "07" },
+  { id: "intelligence",      label: "Audience Profile",  icon: BarChart2,       num: "02" },
+  { id: "concept-testing",   label: "Concept Testing",   icon: FlaskConical,    num: "03" },
+  { id: "focus-group",       label: "Focus Groups",      icon: MessageSquare,   num: "04" },
+  { id: "survey-simulator",  label: "Surveys",           icon: ClipboardList,   num: "05" },
+  { id: "orchestration",     label: "Orchestration",     icon: GitFork,         num: "06" },
+  { id: "monitor",           label: "Monitor",           icon: Activity,        num: "07" },
 ];
 
 // ─── Placeholder for other modules ──────────────────────────────
@@ -335,7 +335,7 @@ const AudienceAnalysis = () => {
           ) : activeModule === "focus-group" ? (
             <div className="p-4 sm:p-8">
               <div className="mb-4 sm:mb-6">
-                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Focus Group Studio</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Focus Groups</h1>
                 <p className="text-hero-muted text-sm mt-1">Run AI-simulated focus groups with synthetic participants drawn from your audience</p>
               </div>
               <FocusGroup />
@@ -359,7 +359,7 @@ const AudienceAnalysis = () => {
           ) : activeModule === "survey-simulator" ? (
             <div className="p-4 sm:p-8 max-w-3xl">
               <div className="mb-4 sm:mb-6">
-                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Survey Simulator</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Surveys</h1>
                 <p className="text-hero-muted text-sm mt-1">Field a custom survey with your audience and analyse results</p>
               </div>
               <SurveySimulator />

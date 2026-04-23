@@ -1,17 +1,15 @@
 import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
 
 const Navbar = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [
     { label: "Home", to: "/" },
-    { label: "Audience Analysis", to: "/audience-analysis" },
+    { label: "Platform", to: "/audience-analysis" },
     { label: "Contact", to: "/contact" },
   ];
 
@@ -54,16 +52,6 @@ const Navbar = () => {
           })}
         </div>
 
-        {/* Desktop: Request Demo button */}
-        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-          <Button
-            className="bg-[#004638] hover:bg-[#004638]/90 text-white font-semibold text-base px-6 h-10"
-            onClick={() => navigate("/contact")}
-          >
-            Request Demo
-          </Button>
-        </div>
-
         {/* Mobile: hamburger button */}
         <button
           onClick={() => setMobileOpen((o) => !o)}
@@ -95,14 +83,6 @@ const Navbar = () => {
               </Link>
             );
           })}
-          <div className="pt-1 pb-1">
-            <Button
-              className="w-full bg-[#004638] hover:bg-[#004638]/90 text-white font-semibold"
-              onClick={() => { navigate("/contact"); setMobileOpen(false); }}
-            >
-              Request Demo
-            </Button>
-          </div>
         </div>
       )}
     </nav>

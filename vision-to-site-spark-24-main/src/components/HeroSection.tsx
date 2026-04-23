@@ -1,10 +1,6 @@
 import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
-  const navigate = useNavigate();
-
   return (
     <section className="relative bg-hero min-h-screen flex items-center overflow-hidden">
       {/* Background glow effects */}
@@ -22,20 +18,13 @@ const HeroSection = () => {
           <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-5 sm:mb-6 animate-fade-in-up-delay-1">
             <span className="text-hero-foreground">From Questions to</span>
             <br />
-            <span className="text-hero-foreground">Actionable Intelligence</span>
+            <span className="text-hero-foreground">Activation</span>
           </h1>
 
           <p className="text-base sm:text-lg md:text-xl text-hero-muted max-w-2xl mx-auto mb-8 sm:mb-10 animate-fade-in-up-delay-2 leading-relaxed">
             A unified, AI-guided analytics platform that helps teams define, understand, size, report on, and activate audiences — all through natural language.
           </p>
 
-          <div className="flex justify-center animate-fade-in-up-delay-3">
-            <Button size="lg" onClick={() => navigate("/contact")}
-              className="bg-[#004638] hover:bg-[#004638]/90 text-white glow-primary px-6 sm:px-8 py-5 sm:py-6 text-sm sm:text-base">
-              Request a Demo
-              <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
-            </Button>
-          </div>
         </div>
 
         {/* Flow visualization */}
