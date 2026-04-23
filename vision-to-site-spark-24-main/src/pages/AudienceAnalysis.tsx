@@ -46,6 +46,9 @@ const AudienceAnalysis = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const module = MODULES.find((m) => m.id === activeModule)!;
 
+  // Segment to auto-select when landing on Audience Profile
+  const [intelligenceSegmentId, setIntelligenceSegmentId] = useState<string | null>(null);
+
   const selectModule = (id: string) => {
     setActiveModule(id);
     setMobileSidebarOpen(false);
@@ -330,7 +333,7 @@ const AudienceAnalysis = () => {
         <main className="flex-1 overflow-y-auto pt-12 md:pt-0">
           {activeModule === "intelligence" ? (
             <div className="px-4 sm:px-8">
-              <IntelligenceReport embedded />
+              <IntelligenceReport embedded initialSegmentId={intelligenceSegmentId} />
             </div>
           ) : activeModule === "focus-group" ? (
             <div className="p-4 sm:p-8">
@@ -375,7 +378,14 @@ const AudienceAnalysis = () => {
                   {activeModule === "monitor" && "Track audience changes and campaign performance"}
                 </p>
               </div>
-              {activeModule === "audience-builder" && <AudienceBuilder />}
+              {activeModule === "audience-builder" && (
+                <AudienceBuilder
+                  onViewIntelligence={(segId) => {
+                    setIntelligenceSegmentId(segId);
+                    selectModule("intelligence");
+                  }}
+                />
+              )}
               {activeModule === "concept-testing" && <ConceptTesting />}
               {!["audience-builder", "concept-testing"].includes(activeModule) && !["focus-group", "monitor"].includes(activeModule) && (
                 <ComingSoon label={`${module.label} module coming soon`} />

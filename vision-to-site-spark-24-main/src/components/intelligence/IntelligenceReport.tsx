@@ -1,4 +1,16 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+
+// ── Universe projection ───────────────────────────────────────────────────────
+const TOTAL_UNIVERSE = 600_000_000;
+function projectedReach(matchCount: number, surveyTotal: number): number {
+  if (surveyTotal === 0) return 0;
+  return Math.round((matchCount / surveyTotal) * TOTAL_UNIVERSE);
+}
+function fmtReach(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(0)}K`;
+  return n.toLocaleString();
+}
 import { cn } from "@/lib/utils";
 import { Search, SlidersHorizontal, X, Sparkles, Key, Trash2, Loader2, AlertTriangle, Download, Upload, Globe, MessageCircle, Star, Zap, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -36,9 +48,11 @@ import { downloadReport } from "@/lib/reportDownload";
 interface IntelligenceReportProps {
   /** When true, removes the outer page padding (used when embedded inside AudienceAnalysis) */
   embedded?: boolean;
+  /** When set, auto-selects this audience on mount / when it changes */
+  initialSegmentId?: string | null;
 }
 
-const IntelligenceReport = ({ embedded = false }: IntelligenceReportProps) => {
+const IntelligenceReport = ({ embedded = false, initialSegmentId }: IntelligenceReportProps) => {
   const [allData, setAllData] = useState<AudienceRecord[]>([]);
   const [filters, setFilters] = useState<AudienceFilters>({ ...DEFAULT_FILTERS });
   const [loading, setLoading] = useState(true);
@@ -55,6 +69,13 @@ const IntelligenceReport = ({ embedded = false }: IntelligenceReportProps) => {
   useEffect(() => {
     setSegments(loadSegments());
   }, []);
+
+  // Auto-select segment when arriving from Audience Builder "Intelligence Report" button
+  useEffect(() => {
+    if (!initialSegmentId) return;
+    const seg = loadSegments().find((s) => s.id === initialSegmentId);
+    if (seg) setActiveSegment(seg);
+  }, [initialSegmentId]);
 
   // API key state
   const [apiKey, setApiKey] = useState<string | null>(getAnthropicKey());
@@ -234,8 +255,11 @@ const IntelligenceReport = ({ embedded = false }: IntelligenceReportProps) => {
             <div className="flex items-center gap-3">
               <span className="text-xs text-hero-muted font-mono">
                 {activeSegment
-                  ? `${activeSegment.icon} ${activeSegment.name} · n=${segmentBaseData.length.toLocaleString()}`
-                  : `n=${allData.length.toLocaleString()} respondents`}
+                  ? `${activeSegment.icon} ${activeSegment.name} · ~${fmtReach(projectedReach(segmentBaseData.length, allData.length))} reach`
+                  : `~${fmtReach(projectedReach(filtered.length, allData.length))} projected reach`}
+              </span>
+              <span className="text-xs text-hero-muted/50 font-mono">
+                n={activeSegment ? segmentBaseData.length.toLocaleString() : filtered.length.toLocaleString()} survey
               </span>
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
               <span className="text-xs text-green-400">Live</span>
@@ -529,42 +553,126 @@ interface SynthesisPanelProps {
   uploadedFiles: File[];
 }
 
-const SYNTHESIS_INSIGHTS: { threshold: number; items: string[] }[] = [
-  {
-    threshold: 0,
-    items: [
-      "No respondents match the current filter combination. Try broadening your criteria.",
-    ],
-  },
-  {
-    threshold: 1,
-    items: [
-      "Small sample — interpret trends with caution.",
-      "Consider relaxing demographic filters to increase confidence.",
-    ],
-  },
-  {
-    threshold: 100,
-    items: [
-      "Digital channels dominate — social media and streaming are the primary touchpoints for this group.",
-      "Value-consciousness is a key purchase driver; messaging around quality-to-price resonates strongly.",
-      "Weekend and evening engagement windows show the highest activity concentration.",
-    ],
-  },
-  {
-    threshold: 500,
-    items: [
-      "Strong affinity for community and peer recommendation — word-of-mouth and UGC content outperform brand-push tactics.",
-      "Mobile-first audience: over 80% of digital consumption occurs on smartphone.",
-      "Sustainability and authenticity rank above price in brand selection decisions for this cohort.",
-      "High cross-channel users: audiences engaged across 3+ platforms show 2× purchase intent vs. single-channel.",
-    ],
-  },
-];
+// ─── Real data-driven synthesis ──────────────────────────────────────────────
 
-function getSynthesisItems(count: number): string[] {
-  const tier = [...SYNTHESIS_INSIGHTS].reverse().find(t => count >= t.threshold);
-  return tier?.items ?? SYNTHESIS_INSIGHTS[0].items;
+function computeSynthesis(data: AudienceRecord[]): string[] {
+  if (data.length === 0)
+    return ["No respondents match the current criteria — try broadening your filters."];
+  if (data.length < 10)
+    return [
+      `Very small sample (n=${data.length}) — findings may not be representative.`,
+      "Consider relaxing your filters to increase confidence.",
+    ];
+
+  const n = data.length;
+  const pct = (field: keyof AudienceRecord) =>
+    Math.round((data.filter((r) => r[field] === true).length / n) * 100);
+  const avg = (field: keyof AudienceRecord) =>
+    +(data.reduce((s, r) => s + ((r[field] as number) || 0), 0) / n).toFixed(1);
+
+  // ── Demographics ──────────────────────────────────────────────
+  const genderCounts: Record<string, number> = {};
+  const ageCounts: Record<string, number> = {};
+  data.forEach((r) => {
+    genderCounts[r.gender] = (genderCounts[r.gender] || 0) + 1;
+    ageCounts[r.age_group] = (ageCounts[r.age_group] || 0) + 1;
+  });
+  const topGender = Object.entries(genderCounts).sort((a, b) => b[1] - a[1])[0];
+  const topAge    = Object.entries(ageCounts).sort((a, b) => b[1] - a[1])[0];
+  const genderPct = Math.round((topGender[1] / n) * 100);
+  const agePct    = Math.round((topAge[1]    / n) * 100);
+
+  // ── Social platforms ──────────────────────────────────────────
+  const platforms = [
+    { label: "YouTube",    field: "youtube_usage"   as const },
+    { label: "Facebook",   field: "facebook_usage"  as const },
+    { label: "Instagram",  field: "instagram_usage" as const },
+    { label: "TikTok",     field: "tiktok_usage"    as const },
+    { label: "Twitter/X",  field: "twitter_usage"   as const },
+    { label: "Reddit",     field: "reddit_usage"    as const },
+    { label: "LinkedIn",   field: "linkedin_usage"  as const },
+    { label: "Snapchat",   field: "snapchat_usage"  as const },
+  ];
+  const platformRanked = platforms
+    .map((p) => ({ label: p.label, pct: pct(p.field) }))
+    .sort((a, b) => b.pct - a.pct);
+
+  // ── Interests ─────────────────────────────────────────────────
+  const interests = [
+    { label: "fitness",           field: "interest_fitness"          as const },
+    { label: "health & wellness", field: "interest_health_wellness"  as const },
+    { label: "technology",        field: "interest_technology"       as const },
+    { label: "travel",            field: "interest_travel"           as const },
+    { label: "movies",            field: "interest_movies"           as const },
+    { label: "music",             field: "interest_music"            as const },
+    { label: "sports",            field: "interest_sports"           as const },
+    { label: "cooking",           field: "interest_cooking"          as const },
+    { label: "shopping",          field: "interest_shopping"         as const },
+    { label: "finance",           field: "interest_finance"          as const },
+    { label: "reading",           field: "interest_reading"          as const },
+    { label: "gaming",            field: "interest_games"            as const },
+    { label: "art",               field: "interest_art"              as const },
+    { label: "fashion",           field: "interest_fashion"          as const },
+    { label: "nature",            field: "interest_nature"           as const },
+    { label: "live sports",       field: "interest_live_sports"      as const },
+  ];
+  const interestRanked = interests
+    .map((i) => ({ label: i.label, pct: pct(i.field) }))
+    .sort((a, b) => b.pct - a.pct);
+
+  // ── Values ────────────────────────────────────────────────────
+  const values = [
+    { label: "family",                   field: "value_family"                   as const },
+    { label: "working hard",             field: "value_working_hard"             as const },
+    { label: "financial responsibility", field: "value_financial_responsibility" as const },
+    { label: "enjoying life",            field: "value_enjoying_life"            as const },
+    { label: "healthy lifestyle",        field: "value_healthy_lifestyle"        as const },
+    { label: "self-improvement",         field: "value_self_improvement"         as const },
+    { label: "honesty",                  field: "value_honesty"                  as const },
+    { label: "environment",              field: "value_environment"              as const },
+    { label: "looking good",             field: "value_looking_good"             as const },
+    { label: "wealth",                   field: "value_wealth"                   as const },
+  ];
+  const valueRanked = values
+    .map((v) => ({ label: v.label, avg: avg(v.field) }))
+    .sort((a, b) => b.avg - a.avg);
+
+  const highIncomePct    = pct("is_high_income");
+  const dailySocialPct   = pct("is_social_active_daily");
+  const top2Platforms    = platformRanked.slice(0, 2);
+  const top3Interests    = interestRanked.slice(0, 3);
+  const topValue         = valueRanked[0];
+  const bottomValue      = valueRanked[valueRanked.length - 1];
+
+  // ── Build findings ────────────────────────────────────────────
+  const findings: string[] = [];
+
+  // 1 — Demographics
+  findings.push(
+    `${genderPct}% ${topGender[0].toLowerCase()}, with ${topAge[0]} the largest age cohort (${agePct}%) and ${highIncomePct}% classified as high income.`
+  );
+
+  // 2 — Social platforms
+  findings.push(
+    `${top2Platforms[0].label} (${top2Platforms[0].pct}%) and ${top2Platforms[1].label} (${top2Platforms[1].pct}%) are the dominant social channels — prioritise these in media planning.`
+  );
+
+  // 3 — Interests
+  findings.push(
+    `Top interests: ${top3Interests.map((i) => `${i.label} (${i.pct}%)`).join(", ")} — content and partnerships should align to these affinities.`
+  );
+
+  // 4 — Core value
+  findings.push(
+    `"${topValue.label.charAt(0).toUpperCase() + topValue.label.slice(1)}" is the highest-rated personal value (avg ${topValue.avg}/10); messaging centred on this will resonate most. "${bottomValue.label.charAt(0).toUpperCase() + bottomValue.label.slice(1)}" ranks lowest (${bottomValue.avg}/10) — avoid leading with it.`
+  );
+
+  // 5 — Engagement signal
+  findings.push(
+    `${dailySocialPct}% are daily social media users${dailySocialPct > 60 ? ", indicating a highly digitally engaged audience well-suited for always-on campaigns" : dailySocialPct > 30 ? ", showing moderate digital engagement — complement social with broader media" : " — this audience is less dependent on social; consider traditional and search channels"}.`
+  );
+
+  return findings;
 }
 
 const SynthesisPanel = ({
@@ -572,7 +680,8 @@ const SynthesisPanel = ({
 }: SynthesisPanelProps) => {
   const [expanded, setExpanded] = useState(true);
   const pct = total > 0 ? ((filtered.length / total) * 100).toFixed(1) : "0";
-  const items = getSynthesisItems(filtered.length);
+  const reach = projectedReach(filtered.length, total);
+  const items = computeSynthesis(filtered);
   const contextLabel = activeSegment
     ? `${activeSegment.icon} ${activeSegment.name}`
     : nlpApplied
@@ -591,7 +700,9 @@ const SynthesisPanel = ({
         <Zap className="h-4 w-4 text-glow-primary flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <span className="text-sm font-semibold text-hero-foreground">Synthesis</span>
-          <span className="ml-2 text-xs text-hero-muted">{contextLabel} · {filtered.length.toLocaleString()} respondents ({pct}%)</span>
+          <span className="ml-2 text-xs text-hero-muted">
+            {contextLabel} · <span className="text-glow-primary font-semibold">~{fmtReach(reach)}</span> projected reach ({pct}% of 600M)
+          </span>
           {hasExtras && (
             <span className="ml-2 text-xs text-glow-primary/70">
               + {[...extraSources, ...uploadedFiles.map(f => f.name)].join(", ")}
@@ -603,7 +714,16 @@ const SynthesisPanel = ({
 
       {expanded && (
         <div className="px-5 pb-5 space-y-3 border-t border-glow-primary/15">
-          <p className="text-xs text-hero-muted mt-3 mb-2 uppercase tracking-wider font-semibold">Key Findings</p>
+          <div className="mt-3 mb-3 flex items-center gap-4 flex-wrap">
+            <div>
+              <div className="text-2xl font-black text-glow-primary">~{fmtReach(reach)}</div>
+              <div className="text-xs text-hero-muted">projected reach · {pct}% of 600M universe</div>
+            </div>
+            <div className="text-xs text-hero-muted/60 border-l border-surface-card-border pl-4">
+              n={filtered.length.toLocaleString()} survey respondents
+            </div>
+          </div>
+          <p className="text-xs text-hero-muted mb-2 uppercase tracking-wider font-semibold">Key Findings</p>
           <ul className="space-y-2">
             {items.map((item, i) => (
               <li key={i} className="flex gap-2.5 text-sm text-hero-foreground/90">
