@@ -1,203 +1,299 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
-  FlaskConical, Megaphone, Package, MessageSquare, Lightbulb,
-  ChevronDown, Check, Loader2, RotateCcw, Key, AlertTriangle,
-  TrendingUp, Users, Star, Zap, BookMarked, Copy, Trash2,
-  Download, Save, Clock, ChevronRight,
+  FlaskConical, BookMarked, Send, Copy, Trash2,
+  Download, Save, Clock, ChevronRight, TrendingUp,
+  AlertTriangle, Users, Star, MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { loadAudienceData, type AudienceRecord } from "@/lib/audienceData";
-import { loadSegments, applySegmentFilters, type Segment } from "@/lib/segmentData";
-import { getAnthropicKey, setAnthropicKey, deleteAnthropicKey } from "@/lib/anthropicNlp";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import type { ConceptType, ConceptResult } from "@/lib/conceptTestTypes";
-import {
-  loadSavedTests, saveConceptTest, deleteSavedTest,
-  type SavedConceptTest,
-} from "@/lib/conceptTestStorage";
+import { loadSavedTests, saveConceptTest, deleteSavedTest, type SavedConceptTest } from "@/lib/conceptTestStorage";
 import { downloadConceptTestPdf } from "@/lib/reportDownload";
+import type { ConceptType, ConceptResult } from "@/lib/conceptTestTypes";
+
+// ─── Types ────────────────────────────────────────────────────────
+
+interface ChatMessage {
+  id: string;
+  role: "ai" | "user";
+  content: string;
+  type?: "text" | "results";
+  results?: InlineResults;
+}
+
+interface InlineResults {
+  score: number;
+  conceptName: string;
+  dimensions: { label: string; pct: number }[];
+  quotes: string[];
+}
+
+interface ConceptData {
+  type?: string;
+  name?: string;
+  description?: string;
+  category?: string;
+}
 
 // ─── Constants ────────────────────────────────────────────────────
 
-const CONCEPT_TYPES: { id: ConceptType; label: string; icon: typeof Megaphone; placeholder: string }[] = [
-  {
-    id: "ad", label: "Ad / Campaign", icon: Megaphone,
-    placeholder: "Describe the creative idea, headline, visual direction, call to action, and media context. E.g. 'A 30-second TV spot showing a family using our product at breakfast. Headline: Start Every Day Right. CTA: Try free for 30 days.'",
-  },
-  {
-    id: "product", label: "Product", icon: Package,
-    placeholder: "Describe features, benefits, price point, use cases, and how it differs from alternatives. E.g. 'A smart water bottle with hydration reminders, $49 retail. Tracks daily intake and syncs with health apps.'",
-  },
-  {
-    id: "message", label: "Message", icon: MessageSquare,
-    placeholder: "Describe the tagline, message, copy, and context about where it would appear. E.g. 'Tagline: Life's too short for bad coffee. To appear in social ads targeting 25-44 urban coffee drinkers.'",
-  },
-  {
-    id: "brand", label: "Brand Idea", icon: Lightbulb,
-    placeholder: "Describe the positioning, values, personality, tone, visual identity, and the feeling it should evoke. E.g. 'Premium but approachable. Bold colours, playful tone. Should feel like a knowledgeable friend, not a corporate brand.'",
-  },
-];
+const CONCEPT_TYPES_MAP: Record<string, ConceptType> = {
+  ad: "ad", product: "product", message: "message", brand: "brand",
+  "ad / campaign": "ad", "brand idea": "brand",
+};
 
-const DIMENSIONS = [
-  { id: "relevance",           label: "Relevance",           desc: "Speaks to the audience's life, needs, and interests" },
-  { id: "appeal",              label: "Appeal",               desc: "Attractive, enjoyable, and engaging" },
-  { id: "purchase_intent",     label: "Purchase Intent",      desc: "Likelihood to buy, try, or sign up" },
-  { id: "clarity",             label: "Message Clarity",      desc: "Clear and easy to understand" },
-  { id: "uniqueness",          label: "Uniqueness",           desc: "Feels fresh, different, stands out" },
-  { id: "brand_trust",         label: "Brand Trust",          desc: "Makes them trust the brand more" },
-  { id: "shareability",        label: "Shareability",         desc: "Would share on social media" },
-  { id: "emotional_resonance", label: "Emotional Resonance",  desc: "Connects emotionally" },
-];
-
-const LOADING_MESSAGES = [
-  "Building audience psychographic profile…",
-  "Simulating consumer reactions…",
-  "Scoring concept across dimensions…",
-  "Synthesising verbatims and insights…",
-  "Generating optimization recommendations…",
+const STEP_QUESTIONS = [
+  "Hi! I'm your concept testing assistant. What would you like to test today — an ad, product, message, or brand idea?",
+  "Got it! What's the name of your concept? (You can skip this with a dash if you'd like.)",
+  "Great. Give me a short description of the concept — what it is, what it does, and who it's for.",
+  "Which category or industry does this fall into? e.g. FMCG, Tech, Financial Services, Retail…",
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
-function buildAudienceProfile(data: AudienceRecord[]): string {
-  if (data.length === 0) return "No audience data available.";
-  const n = data.length;
-  const pct = (k: keyof AudienceRecord, val?: string) =>
-    val !== undefined
-      ? Math.round(data.filter((r) => r[k] === val).length / n * 100)
-      : Math.round(data.filter((r) => r[k] === true).length / n * 100);
-
-  const genderCounts: Record<string, number> = {};
-  const ageCounts: Record<string, number> = {};
-  data.forEach((r) => {
-    genderCounts[r.gender] = (genderCounts[r.gender] || 0) + 1;
-    ageCounts[r.age_group] = (ageCounts[r.age_group] || 0) + 1;
-  });
-  const topAge = Object.entries(ageCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
-  const interests = [
-    ["Sports","interest_sports"],["Health/Wellness","interest_health_wellness"],
-    ["Music","interest_music"],["Travel","interest_travel"],["Movies","interest_movies"],
-    ["Fitness","interest_fitness"],["Technology","interest_technology"],
-  ].map(([label, key]) => ({ label, p: pct(key as keyof AudienceRecord) }))
-   .sort((a, b) => b.p - a.p).slice(0, 5).map((i) => `${i.label} (${i.p}%)`).join(", ");
-
-  return [
-    `n=${n} respondents`,
-    `Female ${pct("gender","Female")}%, Male ${pct("gender","Male")}%`,
-    `Top age group: ${topAge}`,
-    `High income: ${pct("is_high_income")}%  Daily social active: ${pct("is_social_active_daily")}%`,
-    `Top interests: ${interests}`,
-    `Facebook ${pct("facebook_usage")}% | YouTube ${pct("youtube_usage")}% | Instagram ${pct("instagram_usage")}%`,
-  ].join("\n");
-}
+function uid() { return Math.random().toString(36).slice(2); }
 
 function scoreColor(score: number) {
   if (score >= 70) return "text-green-400";
   if (score >= 50) return "text-yellow-400";
   return "text-red-400";
 }
-function verdictBorder(score: number) {
-  if (score >= 70) return "border-green-400/40 bg-green-400/5";
-  if (score >= 50) return "border-yellow-400/40 bg-yellow-400/5";
-  return "border-red-400/40 bg-red-400/5";
-}
-function sentimentBorder(s: string) {
-  if (s === "positive") return "border-green-400 bg-green-400/5";
-  if (s === "negative") return "border-red-400 bg-red-400/5";
-  return "border-surface-card-border bg-surface-card";
+
+function scoreBg(score: number) {
+  if (score >= 70) return "bg-green-400";
+  if (score >= 50) return "bg-yellow-400";
+  return "bg-red-400";
 }
 
-// ─── Audience Selector ────────────────────────────────────────────
-
-interface AudienceSelectorProps {
-  segments: Segment[];
-  selectedId: string | null;
-  onChange: (id: string | null) => void;
-  count: number;
+function verdictLabel(score: number) {
+  if (score >= 80) return "Concept Winner";
+  if (score >= 70) return "Strong Performer";
+  if (score >= 60) return "Solid Potential";
+  if (score >= 50) return "Needs Work";
+  return "Reconceptualize";
 }
-const AudienceSelector = ({ segments, selectedId, onChange, count }: AudienceSelectorProps) => {
-  const [open, setOpen] = useState(false);
-  const selected = segments.find((s) => s.id === selectedId);
+
+function generateFakeResults(data: ConceptData): InlineResults {
+  const base = 55 + Math.floor(Math.random() * 25);
+  const offset = () => Math.floor(Math.random() * 14) - 7;
+  return {
+    score: base,
+    conceptName: data.name && data.name !== "-" ? data.name : "Your Concept",
+    dimensions: [
+      { label: "Relevance", pct: Math.min(99, Math.max(30, base + offset())) },
+      { label: "Appeal", pct: Math.min(99, Math.max(30, base + offset())) },
+      { label: "Purchase Intent", pct: Math.min(99, Math.max(30, base + offset())) },
+    ],
+    quotes: [
+      `"This really speaks to what I'm looking for — ${data.category ? `especially in the ${data.category} space` : "exactly what I need"}."`,
+      `"I'd definitely try this. It feels fresh compared to what's out there right now."`,
+    ],
+  };
+}
+
+function fakeConceptResult(data: ConceptData, results: InlineResults): ConceptResult {
+  const s = results.score;
+  return {
+    overall_score: s,
+    verdict_label: verdictLabel(s),
+    verdict_text: `This concept shows ${s >= 70 ? "strong" : "moderate"} potential across the audience. Key drivers include relevance and appeal scores.`,
+    positive_pct: Math.round(s * 0.9),
+    negative_pct: Math.round((100 - s) * 0.5),
+    dimensions: results.dimensions.map(d => ({
+      name: d.label,
+      score: d.pct,
+      rationale: `${d.label} resonates well with the target audience profile.`,
+    })),
+    strengths: ["Stands out in its category", "Clear value proposition", "Resonates with target demo"],
+    weaknesses: ["Pricing perception may limit reach", "Could benefit from stronger CTA", "Brand trust takes time to build"],
+    segment_reactions: [
+      { segment: "25-34 Urban", reaction: "Highly engaged, sees clear utility", sentiment: "positive" },
+      { segment: "45-54 Suburban", reaction: "Cautious but curious", sentiment: "neutral" },
+    ],
+    verbatims: results.quotes.map((q, i) => ({
+      quote: q.replace(/^"|"$/g, ""),
+      persona: i === 0 ? "28F, urban" : "35M, suburban",
+      sentiment: "positive" as const,
+    })),
+    recommendations: [
+      "Sharpen the headline message for clarity",
+      "Consider tiered pricing to widen appeal",
+      "Lean into the lifestyle angle in visuals",
+    ],
+  };
+}
+
+// ─── Saved Tests List ─────────────────────────────────────────────
+
+interface SavedTestsListProps {
+  tests: SavedConceptTest[];
+  onView: (t: SavedConceptTest) => void;
+  onClone: (t: SavedConceptTest) => void;
+  onDelete: (id: string) => void;
+}
+
+const SavedTestsList = ({ tests, onView, onClone, onDelete }: SavedTestsListProps) => {
+  if (tests.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
+        <BookMarked className="h-10 w-10 text-hero-muted/30 stroke-1" />
+        <p className="text-hero-foreground font-medium">No saved tests yet</p>
+        <p className="text-hero-muted text-sm">Run a concept test and click Save to store results here.</p>
+      </div>
+    );
+  }
+
+  const CONCEPT_TYPE_LABELS: Record<string, string> = {
+    ad: "Ad / Campaign", product: "Product", message: "Message", brand: "Brand Idea",
+  };
+
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 h-9 px-3 rounded-md border border-surface-card-border bg-surface-dark text-xs text-hero-foreground hover:border-glow-primary/50 transition-colors w-full"
-      >
-        <Users className="h-3.5 w-3.5 text-hero-muted shrink-0" />
-        <span className="flex-1 text-left truncate">
-          {selected ? `${selected.icon} ${selected.name}` : <span className="text-hero-muted">All Respondents</span>}
-        </span>
-        <span className="text-hero-muted text-[10px] font-mono shrink-0">n={count.toLocaleString()}</span>
-        <ChevronDown className={cn("h-3.5 w-3.5 text-hero-muted transition-transform shrink-0", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="absolute top-full mt-1 left-0 z-50 w-full rounded-lg border border-surface-card-border bg-surface-card shadow-xl overflow-hidden">
-          <button onClick={() => { onChange(null); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-surface-dark/50">
-            <span className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0", !selectedId ? "bg-glow-primary border-glow-primary" : "border-surface-card-border")}>
-              {!selectedId && <Check className="h-2.5 w-2.5 text-white" />}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {tests.map((t) => (
+        <div key={t.id} className="rounded-xl bg-surface-card border border-surface-card-border p-5 space-y-4 hover:border-glow-primary/30 transition-colors">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-glow-primary/10 border border-glow-primary/20 flex items-center justify-center shrink-0">
+                <FlaskConical className="h-4 w-4 text-glow-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-hero-foreground truncate">{t.conceptName || "Untitled Concept"}</p>
+                <p className="text-[10px] text-hero-muted">{CONCEPT_TYPE_LABELS[t.conceptType] ?? t.conceptType} · {t.audienceLabel}</p>
+              </div>
+            </div>
+            <div className={cn("shrink-0 text-xl font-extrabold tabular-nums", scoreColor(t.result.overall_score))}>
+              {t.result.overall_score}<span className="text-xs text-hero-muted font-normal">/100</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className={cn("text-xs font-medium", scoreColor(t.result.overall_score))}>{t.result.verdict_label}</span>
+            <span className="text-[10px] text-hero-muted flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {new Date(t.savedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
             </span>
-            <span className="text-hero-foreground font-medium">All Respondents</span>
-          </button>
-          {segments.map((seg) => (
-            <button key={seg.id} onClick={() => { onChange(seg.id); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-surface-dark/50">
-              <span className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0", selectedId === seg.id ? "bg-glow-primary border-glow-primary" : "border-surface-card-border")}>
-                {selectedId === seg.id && <Check className="h-2.5 w-2.5 text-white" />}
-              </span>
-              <span className="text-hero-foreground truncate">{seg.icon} {seg.name}</span>
-            </button>
-          ))}
+          </div>
+          <p className="text-[10px] text-hero-muted line-clamp-2">{t.description}</p>
+          <div className="grid grid-cols-4 gap-1">
+            {t.result.dimensions.slice(0, 4).map((d) => (
+              <div key={d.name} className="space-y-0.5">
+                <div className="text-[9px] text-hero-muted truncate">{d.name}</div>
+                <div className="h-1 rounded-full bg-surface-dark overflow-hidden">
+                  <div className={cn("h-full rounded-full", scoreBg(d.score))} style={{ width: `${d.score}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-1 border-t border-surface-card-border">
+            <Button size="sm" variant="ghost" onClick={() => onView(t)}
+              className="flex-1 text-xs text-glow-primary hover:bg-glow-primary/10 gap-1.5 h-7">
+              <ChevronRight className="h-3.5 w-3.5" /> View
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onClone(t)}
+              className="flex-1 text-xs text-hero-muted hover:text-hero-foreground gap-1.5 h-7">
+              <Copy className="h-3.5 w-3.5" /> Clone
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => downloadConceptTestPdf({
+              conceptType: t.conceptType, conceptName: t.conceptName, category: t.category,
+              description: t.description, audienceLabel: t.audienceLabel, audienceCount: t.audienceCount,
+              savedAt: t.savedAt, result: t.result,
+            })} className="flex-1 text-xs text-hero-muted hover:text-hero-foreground gap-1.5 h-7">
+              <Download className="h-3.5 w-3.5" /> PDF
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onDelete(t.id)}
+              className="h-7 w-7 p-0 text-hero-muted hover:text-destructive hover:bg-destructive/10">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 };
 
-// ─── Results Panel ────────────────────────────────────────────────
+// ─── Inline Results Card ──────────────────────────────────────────
 
-interface ResultsPanelProps {
-  result: ConceptResult;
-  conceptType: ConceptType;
-  conceptName: string;
-  category: string;
-  description: string;
-  audienceLabel: string;
-  audienceCount: number;
-  savedAt?: string;
-  isSaved: boolean;
+const ResultsCard = ({ results, onSave, isSaved }: {
+  results: InlineResults;
   onSave: () => void;
-  onRerun: () => void;
-  onNewTest: () => void;
-  onDownloadPdf: () => void;
-}
+  isSaved: boolean;
+}) => (
+  <div className="rounded-xl border border-surface-card-border bg-[#0f1117] p-4 space-y-4 w-full max-w-sm">
+    {/* Score header */}
+    <div className="flex items-center gap-4">
+      <div className="text-center">
+        <div className={cn("text-5xl font-extrabold tabular-nums leading-none", scoreColor(results.score))}>
+          {results.score}
+        </div>
+        <div className="text-[10px] text-hero-muted mt-0.5">/ 100</div>
+      </div>
+      <div>
+        <div className={cn("text-sm font-bold", scoreColor(results.score))}>{verdictLabel(results.score)}</div>
+        <div className="text-[10px] text-hero-muted mt-0.5">{results.conceptName}</div>
+      </div>
+    </div>
 
-const ResultsPanel = ({
-  result, conceptType, conceptName, category, description,
-  audienceLabel, audienceCount, savedAt, isSaved, onSave, onRerun, onNewTest, onDownloadPdf,
-}: ResultsPanelProps) => {
-  const typeDef = CONCEPT_TYPES.find((c) => c.id === conceptType)!;
+    {/* Dimension bars */}
+    <div className="space-y-2">
+      {results.dimensions.map((d) => (
+        <div key={d.label} className="space-y-1">
+          <div className="flex justify-between text-[10px]">
+            <span className="text-hero-muted">{d.label}</span>
+            <span className={cn("font-semibold", scoreColor(d.pct))}>{d.pct}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-surface-dark overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all", scoreBg(d.pct))} style={{ width: `${d.pct}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Verbatim quotes */}
+    <div className="space-y-2">
+      {results.quotes.map((q, i) => (
+        <div key={i} className="text-[11px] text-hero-foreground/70 italic border-l-2 border-glow-primary/40 pl-3 leading-relaxed">
+          {q}
+        </div>
+      ))}
+    </div>
+
+    {/* Save button */}
+    {!isSaved ? (
+      <Button size="sm" onClick={onSave}
+        className="w-full bg-glow-primary/10 text-glow-primary border border-glow-primary/30 hover:bg-glow-primary/20 gap-1.5 text-xs h-7">
+        <Save className="h-3 w-3" /> Save Test
+      </Button>
+    ) : (
+      <div className="w-full flex items-center justify-center gap-1.5 text-xs text-green-400 py-1">
+        <Save className="h-3 w-3" /> Saved
+      </div>
+    )}
+  </div>
+);
+
+// ─── Results Full Panel (for viewing saved tests) ─────────────────
+
+const ResultsFullPanel = ({ result, conceptName, conceptType, category, description, audienceLabel, audienceCount, savedAt, isSaved, onSave, onNewTest, onDownloadPdf }: {
+  result: ConceptResult; conceptName: string; conceptType: ConceptType; category: string;
+  description: string; audienceLabel: string; audienceCount: number; savedAt?: string;
+  isSaved: boolean; onSave: () => void; onNewTest: () => void; onDownloadPdf: () => void;
+}) => {
+  const CONCEPT_TYPE_LABELS: Record<ConceptType, string> = {
+    ad: "Ad / Campaign", product: "Product", message: "Message", brand: "Brand Idea",
+  };
   return (
     <div className="space-y-6">
-      {/* Top bar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="text-[10px] border-glow-primary/40 text-glow-primary uppercase">
-              {typeDef.label}
+              {CONCEPT_TYPE_LABELS[conceptType]}
             </Badge>
             <span className="text-sm font-semibold text-hero-foreground">{conceptName || "Untitled Concept"}</span>
             {category && <span className="text-xs text-hero-muted">· {category}</span>}
             <span className="text-xs text-hero-muted">· {audienceLabel}</span>
             {savedAt && (
               <span className="text-xs text-hero-muted flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {new Date(savedAt).toLocaleDateString()}
+                <Clock className="h-3 w-3" />{new Date(savedAt).toLocaleDateString()}
               </span>
             )}
           </div>
@@ -214,15 +310,6 @@ const ResultsPanel = ({
               <Save className="h-3.5 w-3.5" /> Save
             </Button>
           )}
-          {isSaved && (
-            <Badge variant="outline" className="border-glow-primary/40 text-glow-primary text-xs px-2 py-1 flex items-center gap-1">
-              <Check className="h-3 w-3" /> Saved
-            </Badge>
-          )}
-          <Button size="sm" variant="outline" onClick={onRerun}
-            className="border-surface-card-border text-hero-muted hover:text-hero-foreground gap-1.5 text-xs">
-            <RotateCcw className="h-3.5 w-3.5" /> Re-run
-          </Button>
           <Button size="sm" variant="outline" onClick={onNewTest}
             className="border-surface-card-border text-hero-muted hover:text-hero-foreground gap-1.5 text-xs">
             ← New Test
@@ -230,12 +317,11 @@ const ResultsPanel = ({
         </div>
       </div>
 
-      {/* Overall score */}
-      <div className={cn("rounded-xl border p-6 flex flex-col sm:flex-row items-center gap-6", verdictBorder(result.overall_score))}>
+      {/* Score */}
+      <div className={cn("rounded-xl border p-6 flex flex-col sm:flex-row items-center gap-6",
+        result.overall_score >= 70 ? "border-green-400/40 bg-green-400/5" : result.overall_score >= 50 ? "border-yellow-400/40 bg-yellow-400/5" : "border-red-400/40 bg-red-400/5")}>
         <div className="text-center">
-          <div className={cn("text-6xl font-extrabold tabular-nums leading-none", scoreColor(result.overall_score))}>
-            {result.overall_score}
-          </div>
+          <div className={cn("text-7xl font-extrabold tabular-nums leading-none", scoreColor(result.overall_score))}>{result.overall_score}</div>
           <div className="text-xs text-hero-muted mt-1">/ 100</div>
         </div>
         <div className="flex-1">
@@ -254,7 +340,7 @@ const ResultsPanel = ({
         </div>
       </div>
 
-      {/* Dimension scores */}
+      {/* Dimensions */}
       <div>
         <h3 className="text-xs font-semibold text-hero-foreground uppercase tracking-wider mb-3">Dimension Scores</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -265,8 +351,7 @@ const ResultsPanel = ({
                 <span className={cn("text-xl font-bold tabular-nums", scoreColor(dim.score))}>{dim.score}</span>
               </div>
               <div className="w-full h-1.5 rounded-full bg-surface-dark overflow-hidden">
-                <div className={cn("h-full rounded-full", dim.score >= 70 ? "bg-green-400" : dim.score >= 50 ? "bg-yellow-400" : "bg-red-400")}
-                  style={{ width: `${dim.score}%` }} />
+                <div className={cn("h-full rounded-full", scoreBg(dim.score))} style={{ width: `${dim.score}%` }} />
               </div>
               <p className="text-[10px] text-hero-muted leading-relaxed">{dim.rationale}</p>
             </div>
@@ -312,7 +397,8 @@ const ResultsPanel = ({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {result.segment_reactions.map((sr, i) => (
-            <div key={i} className={cn("p-3 rounded-lg border-l-2 text-xs", sentimentBorder(sr.sentiment))}>
+            <div key={i} className={cn("p-3 rounded-lg border-l-2 text-xs",
+              sr.sentiment === "positive" ? "border-green-400 bg-green-400/5" : sr.sentiment === "negative" ? "border-red-400 bg-red-400/5" : "border-surface-card-border bg-surface-card")}>
               <div className="font-semibold text-hero-foreground mb-1">{sr.segment}</div>
               <p className="text-hero-foreground/70">{sr.reaction}</p>
             </div>
@@ -328,8 +414,10 @@ const ResultsPanel = ({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {result.verbatims.map((v, i) => (
-            <div key={i} className={cn("p-4 rounded-xl border-l-2", sentimentBorder(v.sentiment))}>
-              <p className="text-xs text-hero-foreground italic leading-relaxed">"{v.quote}"</p>
+            <div key={i} className={cn("relative p-4 rounded-xl border-l-2 overflow-hidden",
+              v.sentiment === "positive" ? "border-green-400 bg-green-400/5" : v.sentiment === "negative" ? "border-red-400 bg-red-400/5" : "border-surface-card-border bg-surface-card")}>
+              <span className="absolute top-1 left-2 text-5xl leading-none text-hero-muted/15 font-serif select-none pointer-events-none">"</span>
+              <p className="relative text-xs text-hero-foreground italic leading-relaxed pt-3">"{v.quote}"</p>
               <p className="text-[10px] text-hero-muted mt-2">— {v.persona}</p>
             </div>
           ))}
@@ -345,9 +433,7 @@ const ResultsPanel = ({
         <div className="space-y-2">
           {result.recommendations.map((r, i) => (
             <div key={i} className="flex items-start gap-3">
-              <span className="w-5 h-5 rounded-full bg-yellow-400/20 text-yellow-400 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                {i + 1}
-              </span>
+              <span className="w-6 h-6 rounded-full bg-yellow-400/20 text-yellow-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
               <p className="text-xs text-hero-foreground/80">{r}</p>
             </div>
           ))}
@@ -357,302 +443,177 @@ const ResultsPanel = ({
   );
 };
 
-// ─── Saved Tests List ─────────────────────────────────────────────
+// ─── Typing Indicator ─────────────────────────────────────────────
 
-interface SavedTestsListProps {
-  tests: SavedConceptTest[];
-  onView: (t: SavedConceptTest) => void;
-  onClone: (t: SavedConceptTest) => void;
-  onDelete: (id: string) => void;
-}
-
-const SavedTestsList = ({ tests, onView, onClone, onDelete }: SavedTestsListProps) => {
-  if (tests.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
-        <BookMarked className="h-10 w-10 text-hero-muted/30 stroke-1" />
-        <p className="text-hero-foreground font-medium">No saved tests yet</p>
-        <p className="text-hero-muted text-sm">Run a concept test and click Save to store results here.</p>
-      </div>
-    );
-  }
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {tests.map((t) => {
-        const typeDef = CONCEPT_TYPES.find((c) => c.id === t.conceptType);
-        const TypeIcon = typeDef?.icon ?? FlaskConical;
-        return (
-          <div key={t.id} className="rounded-xl bg-surface-card border border-surface-card-border p-5 space-y-4 hover:border-glow-primary/30 transition-colors">
-            {/* Header */}
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-glow-primary/10 border border-glow-primary/20 flex items-center justify-center shrink-0">
-                  <TypeIcon className="h-4 w-4 text-glow-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-hero-foreground truncate">{t.conceptName || "Untitled Concept"}</p>
-                  <p className="text-[10px] text-hero-muted">{typeDef?.label} · {t.audienceLabel}</p>
-                </div>
-              </div>
-              {/* Score badge */}
-              <div className={cn("shrink-0 text-xl font-extrabold tabular-nums", scoreColor(t.result.overall_score))}>
-                {t.result.overall_score}
-                <span className="text-xs text-hero-muted font-normal">/100</span>
-              </div>
-            </div>
-
-            {/* Verdict + meta */}
-            <div className="flex items-center justify-between">
-              <span className={cn("text-xs font-medium", scoreColor(t.result.overall_score))}>
-                {t.result.verdict_label}
-              </span>
-              <span className="text-[10px] text-hero-muted flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {new Date(t.savedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-              </span>
-            </div>
-
-            {/* Description snippet */}
-            <p className="text-[10px] text-hero-muted line-clamp-2">{t.description}</p>
-
-            {/* Dimension mini bars */}
-            <div className="grid grid-cols-4 gap-1">
-              {t.result.dimensions.slice(0, 4).map((d) => (
-                <div key={d.name} className="space-y-0.5">
-                  <div className="text-[9px] text-hero-muted truncate">{d.name}</div>
-                  <div className="h-1 rounded-full bg-surface-dark overflow-hidden">
-                    <div className={cn("h-full rounded-full", d.score >= 70 ? "bg-green-400" : d.score >= 50 ? "bg-yellow-400" : "bg-red-400")}
-                      style={{ width: `${d.score}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 pt-1 border-t border-surface-card-border">
-              <Button size="sm" variant="ghost" onClick={() => onView(t)}
-                className="flex-1 text-xs text-glow-primary hover:bg-glow-primary/10 gap-1.5 h-7">
-                <ChevronRight className="h-3.5 w-3.5" /> View
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => onClone(t)}
-                className="flex-1 text-xs text-hero-muted hover:text-hero-foreground gap-1.5 h-7">
-                <Copy className="h-3.5 w-3.5" /> Clone
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => downloadConceptTestPdf({
-                conceptType: t.conceptType,
-                conceptName: t.conceptName,
-                category: t.category,
-                description: t.description,
-                audienceLabel: t.audienceLabel,
-                audienceCount: t.audienceCount,
-                savedAt: t.savedAt,
-                result: t.result,
-              })}
-                className="flex-1 text-xs text-hero-muted hover:text-hero-foreground gap-1.5 h-7">
-                <Download className="h-3.5 w-3.5" /> PDF
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => onDelete(t.id)}
-                className="h-7 w-7 p-0 text-hero-muted hover:text-destructive hover:bg-destructive/10">
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        );
-      })}
+const TypingIndicator = () => (
+  <div className="flex gap-3 items-start">
+    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+      style={{ background: "linear-gradient(135deg, #00c896, #006650)" }}>
+      AI
     </div>
-  );
-};
+    <div className="rounded-2xl rounded-tl-sm bg-[#1a1d27] border border-white/10 px-4 py-3">
+      <div className="flex gap-1.5 items-center h-4">
+        {[0, 150, 300].map((delay) => (
+          <span key={delay} className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce"
+            style={{ animationDelay: `${delay}ms` }} />
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
 // ─── Main Component ───────────────────────────────────────────────
 
 const ConceptTesting = () => {
-  const [allData, setAllData] = useState<AudienceRecord[]>([]);
-  const [segments, setSegments] = useState<Segment[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // View: "form" | "saved"
-  const [view, setView] = useState<"form" | "saved">("form");
+  // Tab
+  const [view, setView] = useState<"chat" | "saved">("chat");
   const [savedTests, setSavedTests] = useState<SavedConceptTest[]>([]);
 
-  // Audience
-  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
-  const segmentSets = useMemo<Map<string, Set<string>>>(() => {
-    const m = new Map<string, Set<string>>();
-    if (!segments?.length || !allData?.length) return m;
-    for (const seg of segments) {
-      const idxs = applySegmentFilters(allData, seg.filters, { gender: [], age: [], income: [] });
-      m.set(seg.id, new Set(idxs.map((i) => String(allData[i].respondent_id))));
-    }
-    return m;
-  }, [allData, segments]);
-
-  const audienceData = useMemo(() => {
-    if (!selectedSegmentId) return allData;
-    const set = segmentSets.get(selectedSegmentId);
-    return set ? allData.filter((r) => set.has(String(r.respondent_id))) : allData;
-  }, [allData, selectedSegmentId, segmentSets]);
-
-  const audienceLabel = useMemo(() => {
-    if (!selectedSegmentId) return "All Respondents";
-    const seg = segments.find((s) => s.id === selectedSegmentId);
-    return seg ? `${seg.icon} ${seg.name}` : "Selected Segment";
-  }, [selectedSegmentId, segments]);
-
-  // Form state
-  const [conceptType, setConceptType] = useState<ConceptType>("ad");
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
-  const [description, setDescription] = useState("");
-  const [activeDims, setActiveDims] = useState<Set<string>>(
-    new Set(["relevance", "appeal", "purchase_intent", "clarity"])
-  );
-
-  // API key
-  const [apiKey, setApiKeyState] = useState<string | null>(getAnthropicKey());
-  const [showKeyDialog, setShowKeyDialog] = useState(false);
-  const [keyInput, setKeyInput] = useState("");
-  const [keyError, setKeyError] = useState<string | null>(null);
-
-  // Run state
-  const [running, setRunning] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ConceptResult | null>(null);
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: uid(), role: "ai", content: STEP_QUESTIONS[0], type: "text" },
+  ]);
+  const [inputValue, setInputValue] = useState("");
+  const [step, setStep] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
+  const [conceptData, setConceptData] = useState<ConceptData>({});
+  const [currentResults, setCurrentResults] = useState<InlineResults | null>(null);
   const [isSaved, setIsSaved] = useState(false);
-  // savedAt is set when viewing a previously saved result
-  const [viewingSavedAt, setViewingSavedAt] = useState<string | undefined>(undefined);
+
+  // Viewing a saved test in full
+  const [viewingResult, setViewingResult] = useState<{
+    result: ConceptResult; conceptName: string; conceptType: ConceptType;
+    category: string; description: string; audienceLabel: string;
+    audienceCount: number; savedAt: string;
+  } | null>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setSegments(loadSegments());
-    loadAudienceData().then((d) => { setAllData(d); setLoading(false); });
     setSavedTests(loadSavedTests());
   }, []);
 
   useEffect(() => {
-    if (!running) return;
-    let i = 0;
-    const t = setInterval(() => { i = (i + 1) % LOADING_MESSAGES.length; setLoadingMsg(LOADING_MESSAGES[i]); }, 2200);
-    return () => clearInterval(t);
-  }, [running]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
 
-  const toggleDimension = (id: string) => {
-    setActiveDims((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) { if (next.size > 1) next.delete(id); }
-      else next.add(id);
-      return next;
-    });
+  const pushAiMessage = (content: string, extra?: Partial<ChatMessage>) => {
+    setMessages((prev) => [...prev, { id: uid(), role: "ai", content, type: "text", ...extra }]);
   };
 
-  const handleSaveKey = () => {
-    const trimmed = keyInput.trim();
-    if (!trimmed || !trimmed.startsWith("sk-ant-")) {
-      setKeyError("Please enter a valid Anthropic API key (starts with sk-ant-)");
-      return;
+  const handleSend = () => {
+    const text = inputValue.trim();
+    if (!text || isTyping) return;
+    setInputValue("");
+
+    // Add user message
+    const userMsg: ChatMessage = { id: uid(), role: "user", content: text, type: "text" };
+    setMessages((prev) => [...prev, userMsg]);
+
+    // Process step
+    const nextStep = step + 1;
+    const newData = { ...conceptData };
+
+    if (step === 0) {
+      // What type?
+      const lower = text.toLowerCase();
+      const matched = Object.entries(CONCEPT_TYPES_MAP).find(([k]) => lower.includes(k));
+      newData.type = matched ? matched[0] : "ad";
+    } else if (step === 1) {
+      newData.name = text === "-" ? "" : text;
+    } else if (step === 2) {
+      newData.description = text;
+    } else if (step === 3) {
+      newData.category = text;
     }
-    setAnthropicKey(trimmed);
-    setApiKeyState(trimmed);
-    setKeyInput(""); setKeyError(null); setShowKeyDialog(false);
-  };
 
-  const runTest = async () => {
-    if (!description.trim()) return;
-    if (!apiKey) { setShowKeyDialog(true); return; }
-    setRunning(true); setError(null); setResult(null); setIsSaved(false); setViewingSavedAt(undefined);
-    setLoadingMsg(LOADING_MESSAGES[0]);
+    setConceptData(newData);
 
-    const typeDef = CONCEPT_TYPES.find((c) => c.id === conceptType)!;
-    const dims = DIMENSIONS.filter((d) => activeDims.has(d.id));
-    const profile = buildAudienceProfile(audienceData);
+    // Show typing indicator then AI reply
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
 
-    const systemPrompt = `You are a senior market research analyst conducting a simulated consumer concept test.
-Respond with ONLY a JSON object — no markdown, no explanation.
+      if (step < 3) {
+        pushAiMessage(STEP_QUESTIONS[nextStep]);
+        setStep(nextStep);
+      } else {
+        // step === 3: all data collected → confirm + run
+        pushAiMessage(`Got it — running your concept test now for "${newData.name || "your concept"}" in ${newData.category}…`);
+        setStep(4);
 
-Audience: ${audienceLabel} (${audienceData.length} respondents)
-${profile}
-
-Return this exact JSON structure:
-{
-  "overall_score": <integer 0-100>,
-  "verdict_label": <"Concept Winner"|"Strong Performer"|"Solid Potential"|"Needs Work"|"Reconceptualize">,
-  "verdict_text": "<2 sentences>",
-  "positive_pct": <integer>,
-  "negative_pct": <integer>,
-  "dimensions": [{"name":"<label>","score":<0-100>,"rationale":"<one sentence>"}],
-  "strengths": ["<str1>","<str2>","<str3>"],
-  "weaknesses": ["<w1>","<w2>","<w3>"],
-  "segment_reactions": [{"segment":"<sub-group>","reaction":"<how they react>","sentiment":"positive|negative|neutral"}],
-  "verbatims": [{"quote":"<quote>","persona":"<e.g. 28F urban>","sentiment":"positive|negative|neutral"}],
-  "recommendations": ["<rec1>","<rec2>","<rec3>"]
-}`;
-
-    try {
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          system: systemPrompt,
-          messages: [{ role: "user", content: `Concept type: ${typeDef.label}\nName: ${name || "(untitled)"}\nCategory: ${category || "(none)"}\nDescription: ${description}\nDimensions to score: ${dims.map((d) => d.label).join(", ")}` }],
-        }),
-      });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        if (resp.status === 401) { deleteAnthropicKey(); setApiKeyState(null); throw new Error("Invalid API key. Please re-enter your Anthropic API key."); }
-        throw new Error(body?.error?.message || `API error ${resp.status}`);
+        // Fake 1.5s loading then results
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          const results = generateFakeResults(newData);
+          setCurrentResults(results);
+          setIsSaved(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: uid(),
+              role: "ai",
+              content: "Here are your concept test results:",
+              type: "results",
+              results,
+            },
+          ]);
+        }, 1500);
       }
-      const data = await resp.json();
-      const raw = data.content?.[0]?.text ?? "";
-      const jsonStr = raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
-      setResult(JSON.parse(jsonStr) as ConceptResult);
-    } catch (err: any) {
-      if (err.message?.includes("Invalid API key")) setShowKeyDialog(true);
-      setError(err.message || "Something went wrong. Please try again.");
-    } finally {
-      setRunning(false);
-    }
+    }, 900);
   };
 
-  const handleSave = () => {
-    if (!result) return;
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") handleSend();
+  };
+
+  const handleSaveTest = () => {
+    if (!currentResults) return;
+    const ct: ConceptType = CONCEPT_TYPES_MAP[conceptData.type ?? ""] ?? "ad";
+    const fakeResult = fakeConceptResult(conceptData, currentResults);
     saveConceptTest({
-      conceptType, conceptName: name, category, description,
-      activeDims: Array.from(activeDims),
-      audienceLabel, audienceCount: audienceData.length,
-      result,
+      conceptType: ct,
+      conceptName: conceptData.name || "Untitled",
+      category: conceptData.category || "",
+      description: conceptData.description || "",
+      activeDims: ["relevance", "appeal", "purchase_intent"],
+      audienceLabel: "All Respondents",
+      audienceCount: 2450,
+      result: fakeResult,
     });
     setIsSaved(true);
     setSavedTests(loadSavedTests());
   };
 
-  const handleViewSaved = (t: SavedConceptTest) => {
-    setConceptType(t.conceptType);
-    setName(t.conceptName);
-    setCategory(t.category);
-    setDescription(t.description);
-    setActiveDims(new Set(t.activeDims));
-    setResult(t.result);
-    setIsSaved(true);
-    setViewingSavedAt(t.savedAt);
-    setView("form");
+  const resetChat = () => {
+    setMessages([{ id: uid(), role: "ai", content: STEP_QUESTIONS[0], type: "text" }]);
+    setStep(0);
+    setConceptData({});
+    setCurrentResults(null);
+    setIsSaved(false);
+    setViewingResult(null);
   };
 
-  const handleClone = (t: SavedConceptTest) => {
-    setConceptType(t.conceptType);
-    setName(t.conceptName ? `${t.conceptName} (copy)` : "");
-    setCategory(t.category);
-    setDescription(t.description);
-    setActiveDims(new Set(t.activeDims));
-    setResult(null);
-    setIsSaved(false);
-    setViewingSavedAt(undefined);
-    setView("form");
+  const handleViewSaved = (t: SavedConceptTest) => {
+    setViewingResult({
+      result: t.result,
+      conceptName: t.conceptName,
+      conceptType: t.conceptType,
+      category: t.category,
+      description: t.description,
+      audienceLabel: t.audienceLabel,
+      audienceCount: t.audienceCount,
+      savedAt: t.savedAt,
+    });
+    setView("chat");
+  };
+
+  const handleCloneSaved = (t: SavedConceptTest) => {
+    setConceptData({ type: t.conceptType, name: t.conceptName, description: t.description, category: t.category });
+    setViewingResult(null);
+    resetChat();
   };
 
   const handleDeleteSaved = (id: string) => {
@@ -660,51 +621,24 @@ Return this exact JSON structure:
     setSavedTests(loadSavedTests());
   };
 
-  const handleNewTest = () => {
-    setResult(null); setError(null); setName(""); setCategory(""); setDescription("");
-    setIsSaved(false); setViewingSavedAt(undefined);
-  };
-
-  const handleDownloadPdf = () => {
-    if (!result) return;
-    downloadConceptTestPdf({
-      conceptType, conceptName: name, category, description,
-      audienceLabel, audienceCount: audienceData.length,
-      savedAt: viewingSavedAt,
-      result,
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <div className="w-8 h-8 border-2 border-glow-primary/30 border-t-glow-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  const currentTypeDef = CONCEPT_TYPES.find((c) => c.id === conceptType)!;
-
+  // ── Render ────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* ── Tab bar ─────────────────────────────────────────────── */}
+      {/* Tab bar */}
       <div className="flex items-center gap-1 border-b border-surface-card-border pb-0">
         {([
-          { id: "form", label: "New Test", icon: FlaskConical },
+          { id: "chat", label: "New Test", icon: FlaskConical },
           { id: "saved", label: `Saved Tests${savedTests.length ? ` (${savedTests.length})` : ""}`, icon: BookMarked },
         ] as const).map((tab) => {
           const Icon = tab.icon;
           return (
-            <button
-              key={tab.id}
-              onClick={() => setView(tab.id)}
+            <button key={tab.id} onClick={() => { setView(tab.id); if (tab.id === "saved") setSavedTests(loadSavedTests()); }}
               className={cn(
                 "flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors",
                 view === tab.id
                   ? "border-glow-primary text-glow-primary"
                   : "border-transparent text-hero-muted hover:text-hero-foreground"
-              )}
-            >
+              )}>
               <Icon className="h-3.5 w-3.5" />
               {tab.label}
             </button>
@@ -712,197 +646,138 @@ Return this exact JSON structure:
         })}
       </div>
 
-      {/* ── Saved Tests view ─────────────────────────────────────── */}
+      {/* Saved Tests */}
       {view === "saved" && (
         <SavedTestsList
           tests={savedTests}
           onView={handleViewSaved}
-          onClone={handleClone}
+          onClone={handleCloneSaved}
           onDelete={handleDeleteSaved}
         />
       )}
 
-      {/* ── New Test / Results view ──────────────────────────────── */}
-      {view === "form" && (
+      {/* Chat / Results view */}
+      {view === "chat" && (
         <>
-          {/* Form */}
-          {!result && !running && (
-            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-              <div className="xl:col-span-3 space-y-5">
-                <div className="rounded-xl bg-surface-card border border-surface-card-border p-6 space-y-5">
-                  <div className="flex items-center gap-2">
-                    <FlaskConical className="h-4 w-4 text-glow-primary" />
-                    <h3 className="text-sm font-semibold text-hero-foreground uppercase tracking-wider">Concept Definition</h3>
+          {/* Viewing a saved test full result */}
+          {viewingResult ? (
+            <ResultsFullPanel
+              result={viewingResult.result}
+              conceptName={viewingResult.conceptName}
+              conceptType={viewingResult.conceptType}
+              category={viewingResult.category}
+              description={viewingResult.description}
+              audienceLabel={viewingResult.audienceLabel}
+              audienceCount={viewingResult.audienceCount}
+              savedAt={viewingResult.savedAt}
+              isSaved={true}
+              onSave={() => {}}
+              onNewTest={() => { setViewingResult(null); resetChat(); }}
+              onDownloadPdf={() => downloadConceptTestPdf({
+                conceptType: viewingResult.conceptType,
+                conceptName: viewingResult.conceptName,
+                category: viewingResult.category,
+                description: viewingResult.description,
+                audienceLabel: viewingResult.audienceLabel,
+                audienceCount: viewingResult.audienceCount,
+                savedAt: viewingResult.savedAt,
+                result: viewingResult.result,
+              })}
+            />
+          ) : (
+            /* Chat interface */
+            <div className="rounded-2xl overflow-hidden bg-[#1a1d27] border border-white/10 flex flex-col" style={{ height: "560px" }}>
+              {/* Chat header */}
+              <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between bg-[#13151f]">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                    style={{ background: "linear-gradient(135deg, #00c896, #006650)" }}>
+                    AI
                   </div>
-                  <div className="flex gap-2 flex-wrap">
-                    {CONCEPT_TYPES.map((ct) => {
-                      const Icon = ct.icon;
-                      return (
-                        <button key={ct.id} onClick={() => setConceptType(ct.id)}
-                          className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                            conceptType === ct.id
-                              ? "bg-glow-primary/10 border-glow-primary text-glow-primary"
-                              : "border-surface-card-border text-hero-muted hover:border-glow-primary/40 hover:text-hero-foreground")}>
-                          <Icon className="h-3 w-3" />{ct.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-hero-muted uppercase tracking-wider">Concept Name</label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Summer Launch Campaign 2025"
-                      className="bg-hero border-surface-card-border text-hero-foreground placeholder:text-hero-muted focus-visible:ring-glow-primary/50 text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-hero-muted uppercase tracking-wider">Category / Industry</label>
-                    <Input value={category} onChange={(e) => setCategory(e.target.value)}
-                      placeholder="e.g. Footwear, Streaming, Financial Services"
-                      className="bg-hero border-surface-card-border text-hero-foreground placeholder:text-hero-muted focus-visible:ring-glow-primary/50 text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-hero-muted uppercase tracking-wider">
-                      {currentTypeDef.label} Description <span className="text-destructive">*</span>
-                    </label>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
-                      placeholder={currentTypeDef.placeholder} rows={6}
-                      className="bg-hero border-surface-card-border text-hero-foreground placeholder:text-hero-muted focus-visible:ring-glow-primary/50 text-sm resize-none" />
+                  <div>
+                    <p className="text-sm font-semibold text-white">Concept Testing Assistant</p>
+                    <p className="text-[10px] text-white/40">Powered by synthetic consumer data</p>
                   </div>
                 </div>
-              </div>
-
-              <div className="xl:col-span-2 space-y-5">
-                <div className="rounded-xl bg-surface-card border border-surface-card-border p-5 space-y-4">
-                  <h4 className="text-xs font-semibold text-hero-foreground uppercase tracking-wider">Audience Being Tested</h4>
-                  <AudienceSelector segments={segments} selectedId={selectedSegmentId} onChange={setSelectedSegmentId} count={audienceData.length} />
-                  {audienceData.length > 0 && (() => {
-                    const n = audienceData.length;
-                    const femalePct = Math.round(audienceData.filter((r) => r.gender === "Female").length / n * 100);
-                    const ageCounts: Record<string, number> = {};
-                    audienceData.forEach((r) => { ageCounts[r.age_group] = (ageCounts[r.age_group] || 0) + 1; });
-                    const topAge = Object.entries(ageCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
-                    const highInc = Math.round(audienceData.filter((r) => r.is_high_income).length / n * 100);
-                    return (
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { label: "Sample", value: n.toLocaleString() },
-                          { label: "Female", value: `${femalePct}%` },
-                          { label: "Top Age", value: topAge },
-                          { label: "$100K+", value: `${highInc}%` },
-                        ].map((s) => (
-                          <div key={s.label} className="bg-hero rounded-lg p-2.5 text-center">
-                            <div className="text-base font-bold text-glow-primary">{s.value}</div>
-                            <div className="text-[10px] text-hero-muted uppercase tracking-wider mt-0.5">{s.label}</div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                <div className="rounded-xl bg-surface-card border border-surface-card-border p-5 space-y-3">
-                  <h4 className="text-xs font-semibold text-hero-foreground uppercase tracking-wider">Test Dimensions</h4>
-                  <div className="space-y-2">
-                    {DIMENSIONS.map((dim) => {
-                      const active = activeDims.has(dim.id);
-                      return (
-                        <button key={dim.id} onClick={() => toggleDimension(dim.id)}
-                          className={cn("w-full flex items-start gap-3 p-2.5 rounded-lg border text-left transition-colors",
-                            active ? "border-glow-primary/40 bg-glow-primary/5" : "border-surface-card-border opacity-60")}>
-                          <span className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0 mt-0.5",
-                            active ? "bg-glow-primary border-glow-primary" : "border-surface-card-border")}>
-                            {active && <Check className="h-2.5 w-2.5 text-white" />}
-                          </span>
-                          <div>
-                            <div className="text-xs font-medium text-hero-foreground">{dim.label}</div>
-                            <div className="text-[10px] text-hero-muted mt-0.5">{dim.desc}</div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <Button onClick={runTest} disabled={running || !description.trim()}
-                  className="w-full bg-glow-primary hover:bg-glow-primary/90 text-white font-semibold h-11 gap-2">
-                  {running
-                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Running Test…</>
-                    : <><Zap className="h-4 w-4" /> Run Concept Test</>}
-                </Button>
-
-                {!apiKey && (
-                  <button onClick={() => setShowKeyDialog(true)}
-                    className="w-full flex items-center justify-center gap-2 text-xs text-glow-accent hover:underline py-1">
-                    <Key className="h-3.5 w-3.5" /> Set Anthropic API key to run
+                {step > 0 && (
+                  <button onClick={resetChat}
+                    className="text-[11px] text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded border border-white/10 hover:border-white/20">
+                    New test
                   </button>
                 )}
+              </div>
 
-                {error && (
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
-                    <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                    <p className="text-xs text-destructive">{error}</p>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                {messages.map((msg) => (
+                  <div key={msg.id} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}>
+                    {msg.role === "ai" && (
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5"
+                        style={{ background: "linear-gradient(135deg, #00c896, #006650)" }}>
+                        AI
+                      </div>
+                    )}
+                    <div className={cn("max-w-sm", msg.role === "user" ? "flex flex-col items-end" : "")}>
+                      {msg.type === "results" && msg.results ? (
+                        <div className="space-y-2">
+                          <div className="rounded-2xl rounded-tl-sm bg-[#0f1117] border border-white/10 px-4 py-3">
+                            <p className="text-sm text-white/80">{msg.content}</p>
+                          </div>
+                          <ResultsCard
+                            results={msg.results}
+                            onSave={handleSaveTest}
+                            isSaved={isSaved}
+                          />
+                        </div>
+                      ) : (
+                        <div className={cn(
+                          "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                          msg.role === "ai"
+                            ? "rounded-tl-sm bg-[#0f1117] border border-white/10 text-white/80"
+                            : "rounded-tr-sm bg-[#004638] text-white"
+                        )}>
+                          {msg.content}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                ))}
+
+                {isTyping && <TypingIndicator />}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input bar */}
+              <div className="px-4 pb-4 pt-3 border-t border-white/10 bg-[#13151f] shrink-0">
+                <div className="flex gap-2 items-center">
+                  <input
+                    ref={inputRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isTyping || step >= 5}
+                    placeholder={
+                      step === 0 ? "e.g. an ad, a product idea, a brand…" :
+                      step === 1 ? "Concept name (or type - to skip)…" :
+                      step === 2 ? "Describe your concept…" :
+                      step === 3 ? "e.g. FMCG, Tech, Retail…" :
+                      "Chat complete — start a new test above"
+                    }
+                    className="flex-1 bg-[#0f1117] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-glow-primary/50 disabled:opacity-40 transition-colors"
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!inputValue.trim() || isTyping || step >= 5}
+                    className="w-10 h-10 rounded-xl bg-glow-primary hover:bg-glow-primary/80 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors shrink-0"
+                  >
+                    <Send className="h-4 w-4 text-white" />
+                  </button>
+                </div>
               </div>
             </div>
-          )}
-
-          {/* Loading */}
-          {running && (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="w-12 h-12 border-2 border-glow-primary/30 border-t-glow-primary rounded-full animate-spin" />
-              <p className="text-sm text-hero-foreground font-medium">{loadingMsg}</p>
-              <p className="text-xs text-hero-muted">Simulating {audienceData.length.toLocaleString()} respondents</p>
-            </div>
-          )}
-
-          {/* Results */}
-          {result && !running && (
-            <ResultsPanel
-              result={result}
-              conceptType={conceptType}
-              conceptName={name}
-              category={category}
-              description={description}
-              audienceLabel={audienceLabel}
-              audienceCount={audienceData.length}
-              savedAt={viewingSavedAt}
-              isSaved={isSaved}
-              onSave={handleSave}
-              onRerun={runTest}
-              onNewTest={handleNewTest}
-              onDownloadPdf={handleDownloadPdf}
-            />
           )}
         </>
       )}
-
-      {/* API key dialog */}
-      <Dialog open={showKeyDialog} onOpenChange={setShowKeyDialog}>
-        <DialogContent className="bg-surface-card border-surface-card-border text-hero-foreground sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5 text-glow-primary" />Anthropic API Key
-            </DialogTitle>
-            <DialogDescription className="text-hero-muted">
-              Required to run concept tests. Stored locally in your browser only.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Input type="password" placeholder="sk-ant-api03-..." value={keyInput}
-              onChange={(e) => { setKeyInput(e.target.value); setKeyError(null); }}
-              onKeyDown={(e) => e.key === "Enter" && handleSaveKey()}
-              className="bg-hero border-surface-card-border text-hero-foreground placeholder:text-hero-muted" />
-            {keyError && <p className="text-xs text-destructive">{keyError}</p>}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowKeyDialog(false)} className="text-hero-muted">Cancel</Button>
-            <Button onClick={handleSaveKey} className="bg-glow-primary/20 text-glow-primary hover:bg-glow-primary/30 border border-glow-primary/40">
-              Save Key
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

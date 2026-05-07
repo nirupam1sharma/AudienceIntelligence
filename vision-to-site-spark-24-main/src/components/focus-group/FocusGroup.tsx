@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Users, Send, Loader2, Key, AlertTriangle, ChevronDown, Check,
   Save, BookOpen, Trash2, Copy, FileText, Zap, StopCircle,
-  MessageSquare, RefreshCw,
+  MessageSquare, RefreshCw, X, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +21,293 @@ import {
   type SavedFocusGroup,
 } from "@/lib/focusGroupStorage";
 import { downloadFocusGroupPdf } from "@/lib/reportDownload";
+
+// ─── Digital Twin Data ────────────────────────────────────────────
+
+interface DigitalTwin {
+  id: string;
+  initials: string;
+  gradient: string;
+  name: string;
+  gender: string;
+  ageRange: string;
+  location: string;
+  archetype: string;
+  tags: string[];
+  personality: string[];
+  values: string[];
+  mediaHabits: string[];
+  brandRelationships: string[];
+}
+
+const DIGITAL_TWINS: DigitalTwin[] = [
+  {
+    id: "sarah",
+    initials: "SA",
+    gradient: "linear-gradient(135deg, #f56565, #ed64a6)",
+    name: "Sarah",
+    gender: "Female",
+    ageRange: "25-34",
+    location: "London",
+    archetype: "Aspirational Millennial",
+    tags: ["Health-conscious", "Sustainability-first", "Premium brands"],
+    personality: [
+      "Optimistic and goal-oriented, driven by personal growth",
+      "Values authenticity — distrusts overly polished marketing",
+      "Early adopter of wellness trends and ethical lifestyle choices",
+    ],
+    values: [
+      "Sustainability and environmental responsibility",
+      "Work-life balance and personal fulfilment",
+      "Quality over quantity in all purchases",
+    ],
+    mediaHabits: [
+      "Heavy Instagram and YouTube user; follows wellness creators",
+      "Listens to 3-4 podcasts weekly on health, finance, and culture",
+      "Subscribes to 2 premium newsletters; light TV viewer",
+    ],
+    brandRelationships: [
+      "Loyal to Lululemon, Oatly, and Patagonia",
+      "Actively avoids fast fashion and single-use brands",
+      "Willing to pay 20-30% premium for certified sustainable goods",
+    ],
+  },
+  {
+    id: "james",
+    initials: "JA",
+    gradient: "linear-gradient(135deg, #f6ad55, #ed8936)",
+    name: "James",
+    gender: "Male",
+    ageRange: "35-44",
+    location: "Manchester",
+    archetype: "Pragmatic Provider",
+    tags: ["Value-driven", "Family-focused", "Brand-loyal"],
+    personality: [
+      "Practical and deliberate — research-heavy before purchasing",
+      "Prioritises family needs over personal indulgences",
+      "Skeptical of new trends; trusts proven, reliable brands",
+    ],
+    values: [
+      "Financial security and providing for family",
+      "Hard work, reliability, and keeping commitments",
+      "Community ties and local identity",
+    ],
+    mediaHabits: [
+      "Daily newspaper reader and BBC News consumer",
+      "Uses Facebook primarily for local community groups",
+      "Watches football and home improvement content on TV",
+    ],
+    brandRelationships: [
+      "Long-term loyalty to Tesco, Boots, and John Lewis",
+      "Price sensitivity is real but won't sacrifice core quality",
+      "Responds well to loyalty programmes and family-oriented offers",
+    ],
+  },
+  {
+    id: "emily",
+    initials: "EM",
+    gradient: "linear-gradient(135deg, #48bb78, #38a169)",
+    name: "Emily",
+    gender: "Female",
+    ageRange: "18-24",
+    location: "Birmingham",
+    archetype: "Digital Native",
+    tags: ["Trend-aware", "Social-first", "Price-sensitive"],
+    personality: [
+      "Hyper-connected and trend-conscious; lives online-first",
+      "Highly influenced by peers and micro-influencer recommendations",
+      "Brand loyalty is low — always open to the next best thing",
+    ],
+    values: [
+      "Self-expression and individuality",
+      "Inclusivity and representation in marketing",
+      "Instant gratification and seamless digital experiences",
+    ],
+    mediaHabits: [
+      "TikTok is primary content platform — 2+ hours daily",
+      "Instagram for aesthetic inspiration; Snapchat for friends",
+      "Almost no traditional TV; streams everything on demand",
+    ],
+    brandRelationships: [
+      "Engages with ASOS, Depop, and Glossier regularly",
+      "Driven by viral moments and UGC more than ad campaigns",
+      "Actively seeks discount codes and student offers",
+    ],
+  },
+  {
+    id: "michael",
+    initials: "MI",
+    gradient: "linear-gradient(135deg, #63b3ed, #3182ce)",
+    name: "Michael",
+    gender: "Male",
+    ageRange: "45-54",
+    location: "Edinburgh",
+    archetype: "Established Professional",
+    tags: ["Quality-over-price", "Considered buyer", "Brand agnostic"],
+    personality: [
+      "Methodical and independent — forms opinions from evidence",
+      "Confident in his tastes; resistant to hype-driven marketing",
+      "Values time highly; prefers frictionless, efficient experiences",
+    ],
+    values: [
+      "Craft, expertise, and attention to detail",
+      "Intellectual curiosity and continuous learning",
+      "Independence and self-reliance",
+    ],
+    mediaHabits: [
+      "Reads The Economist, FT Weekend, and Wired regularly",
+      "LinkedIn for professional content; minimal social media otherwise",
+      "Enjoys long-form documentaries and radio over streaming",
+    ],
+    brandRelationships: [
+      "Trusts Apple, M&S, and Dyson for consistent quality",
+      "Rarely influenced by sales promotions or urgency tactics",
+      "Responds to heritage narratives and expert endorsements",
+    ],
+  },
+];
+
+// ─── Twin Card ────────────────────────────────────────────────────
+
+const TwinCard = ({ twin, onViewProfile }: { twin: DigitalTwin; onViewProfile: (t: DigitalTwin) => void }) => (
+  <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all flex flex-col gap-4">
+    {/* Avatar + name */}
+    <div className="flex items-center gap-4">
+      <div className="w-[60px] h-[60px] rounded-full flex items-center justify-center text-white text-xl font-bold shrink-0"
+        style={{ background: twin.gradient }}>
+        {twin.initials}
+      </div>
+      <div>
+        <p className="text-base font-bold text-gray-900">{twin.name}</p>
+        <p className="text-sm text-gray-500">{twin.gender}, {twin.ageRange} · {twin.location}</p>
+        <span className="inline-block mt-1 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">
+          {twin.archetype}
+        </span>
+      </div>
+    </div>
+
+    {/* Psychographic tags */}
+    <div className="flex flex-wrap gap-1.5">
+      {twin.tags.map((tag) => (
+        <span key={tag} className="text-[11px] px-2.5 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
+          {tag}
+        </span>
+      ))}
+    </div>
+
+    {/* View Profile button */}
+    <button
+      onClick={() => onViewProfile(twin)}
+      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors mt-auto">
+      View Profile <ChevronRight className="h-4 w-4" />
+    </button>
+  </div>
+);
+
+// ─── Twin Profile Panel ───────────────────────────────────────────
+
+const TwinProfilePanel = ({ twin, onClose, onUseInSession }: {
+  twin: DigitalTwin;
+  onClose: () => void;
+  onUseInSession: () => void;
+}) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-end" style={{ background: "rgba(0,0,0,0.4)" }}
+    onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="w-full max-w-md h-full bg-white flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-right duration-200">
+      {/* Header */}
+      <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center text-white text-2xl font-bold shrink-0"
+            style={{ background: twin.gradient }}>
+            {twin.initials}
+          </div>
+          <div>
+            <p className="text-xl font-bold text-gray-900">{twin.name}</p>
+            <p className="text-sm text-gray-500">{twin.gender}, {twin.ageRange} · {twin.location}</p>
+            <span className="inline-block mt-1.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-full px-2.5 py-0.5">
+              {twin.archetype}
+            </span>
+          </div>
+        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Profile sections */}
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+        {[
+          { title: "Personality", items: twin.personality },
+          { title: "Values", items: twin.values },
+          { title: "Media Habits", items: twin.mediaHabits },
+          { title: "Brand Relationships", items: twin.brandRelationships },
+        ].map((section) => (
+          <div key={section.title}>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2.5">{section.title}</h4>
+            <ul className="space-y-2">
+              {section.items.map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-sm text-gray-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-300 mt-2 shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA */}
+      <div className="px-6 py-5 border-t border-gray-100 shrink-0">
+        <button
+          onClick={onUseInSession}
+          className="w-full py-3 rounded-xl font-semibold text-sm text-white transition-colors"
+          style={{ background: twin.gradient }}>
+          Use in Session
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Twin Landing Screen ──────────────────────────────────────────
+
+const TwinLandingScreen = ({ onProceed }: { onProceed: () => void }) => {
+  const [profileTwin, setProfileTwin] = useState<DigitalTwin | null>(null);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-hero-foreground">Digital Twins</h2>
+          <p className="text-sm text-hero-muted mt-0.5">Select a pre-built AI persona to use in your focus group session.</p>
+        </div>
+        <button
+          onClick={onProceed}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-surface-card-border text-xs font-medium text-hero-muted hover:text-hero-foreground hover:border-glow-primary/40 transition-colors">
+          Skip to Session Setup <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {DIGITAL_TWINS.map((twin) => (
+          <TwinCard
+            key={twin.id}
+            twin={twin}
+            onViewProfile={(t) => setProfileTwin(t)}
+          />
+        ))}
+      </div>
+
+      {profileTwin && (
+        <TwinProfilePanel
+          twin={profileTwin}
+          onClose={() => setProfileTwin(null)}
+          onUseInSession={() => { setProfileTwin(null); onProceed(); }}
+        />
+      )}
+    </div>
+  );
+};
 
 // ─── Constants ────────────────────────────────────────────────────
 
@@ -252,6 +539,9 @@ const FocusGroup = () => {
   const [savedSessions, setSavedSessions] = useState<SavedFocusGroup[]>([]);
   const refreshSaved = () => setSavedSessions(loadSavedFocusGroups());
   useEffect(() => { refreshSaved(); }, []);
+
+  // Twin landing — show before session setup on first visit
+  const [showTwinLanding, setShowTwinLanding] = useState(true);
 
   // Session state machine
   const [sessionState, setSessionState] = useState<"setup" | "active" | "ended">("setup");
@@ -513,6 +803,7 @@ Transcript:\n${transcript}`,
     setMessages(s.messages);
     setSummary(s.summary ?? null);
     setSessionState("ended");
+    setShowTwinLanding(false);
     setMainView("new");
   };
 
@@ -523,6 +814,7 @@ Transcript:\n${transcript}`,
     setMessages([]);
     setSummary(null);
     setSessionState("setup");
+    setShowTwinLanding(false);
     setMainView("new");
   };
 
@@ -549,6 +841,7 @@ Transcript:\n${transcript}`,
     setSummary(null);
     setApiError(null);
     setSessionState("setup");
+    setShowTwinLanding(true);
   };
 
   if (loading) return (
@@ -562,7 +855,7 @@ Transcript:\n${transcript}`,
     <div className="space-y-6">
       {/* Top toggle */}
       <div className="flex items-center gap-2 border-b border-surface-card-border pb-3">
-        <button onClick={() => setMainView("new")}
+        <button onClick={() => { setMainView("new"); setShowTwinLanding(true); setSessionState("setup"); }}
           className={cn("px-4 py-1.5 rounded-full text-xs font-medium transition-colors",
             mainView === "new" ? "bg-glow-primary text-white" : "text-hero-muted hover:text-hero-foreground")}>
           New Session
@@ -588,8 +881,17 @@ Transcript:\n${transcript}`,
           onDelete={handleDelete}
           onPdf={handlePdf}
         />
+      ) : showTwinLanding ? (
+        // ── Twin landing ──────────────────────────────────────────
+        <TwinLandingScreen onProceed={() => setShowTwinLanding(false)} />
       ) : sessionState === "setup" ? (
         // ── Setup screen ──────────────────────────────────────────
+        <div className="space-y-4">
+        <button
+          onClick={() => setShowTwinLanding(true)}
+          className="flex items-center gap-1.5 text-xs font-medium text-hero-muted hover:text-hero-foreground transition-colors">
+          <ChevronRight className="h-3.5 w-3.5 rotate-180" /> Back to Digital Twins
+        </button>
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-5">
             {/* Discussion type */}
@@ -674,21 +976,24 @@ Transcript:\n${transcript}`,
             <div className="rounded-xl bg-surface-card border border-surface-card-border p-5 space-y-3">
               <h3 className="text-xs font-semibold text-hero-foreground uppercase tracking-wider">Participant Preview</h3>
               <p className="text-[10px] text-hero-muted">{participantCount} synthetic participants drawn from {audienceLabel} (n={audienceData.length.toLocaleString()})</p>
-              <div className="space-y-2 mt-2">
+              <div className={cn("grid gap-2 mt-2", participantCount <= 4 ? "grid-cols-2" : "grid-cols-3")}>
                 {Array.from({ length: participantCount }).map((_, i) => {
                   const isFemale = i % 2 === 0;
                   const names = isFemale ? FEMALE_NAMES : MALE_NAMES;
-                  const name = names[Math.floor(i / 2) % names.length];
+                  const previewName = names[Math.floor(i / 2) % names.length];
+                  const color = PARTICIPANT_COLORS[i % PARTICIPANT_COLORS.length];
+                  const ageGroups = ["25-34", "35-44", "18-24", "45-54", "25-34", "35-44", "18-24", "45-54"];
+                  const demoLabel = `${isFemale ? "F" : "M"}, ${ageGroups[i % ageGroups.length]}`;
                   return (
-                    <div key={i} className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                        style={{ backgroundColor: PARTICIPANT_COLORS[i % PARTICIPANT_COLORS.length] }}>
-                        {name.slice(0, 2).toUpperCase()}
+                    <div key={i}
+                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-surface-dark border border-surface-card-border hover:border-glow-primary/30 transition-colors text-center">
+                      <div className="w-[60px] h-[60px] rounded-full flex items-center justify-center text-white text-lg font-bold shrink-0"
+                        style={{ background: `radial-gradient(circle at 35% 35%, ${color}cc, ${color}66)`, border: `2px solid ${color}44` }}>
+                        {previewName.slice(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-hero-foreground">{name}</p>
-                        <p className="text-[10px] text-hero-muted">Sampled from audience data</p>
-                      </div>
+                      <p className="text-xs font-bold text-hero-foreground leading-tight">{previewName}</p>
+                      <p className="text-[10px] text-hero-muted">{demoLabel}</p>
+                      <p className="text-[9px] text-hero-muted/50">Sampled from audience</p>
                     </div>
                   );
                 })}
@@ -696,128 +1001,159 @@ Transcript:\n${transcript}`,
             </div>
           </div>
         </div>
+        </div>
 
       ) : sessionState === "active" ? (
-        // ── Active session ────────────────────────────────────────
-        <div className="space-y-4">
-          {/* Session header */}
-          <div className="rounded-xl bg-surface-card border border-surface-card-border px-4 py-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+        // ── Active session — 2-panel chat room ───────────────────
+        <div className="rounded-xl border border-surface-card-border bg-surface-card overflow-hidden flex" style={{ height: "580px" }}>
+          {/* Left panel — participant sidebar */}
+          <div className="w-52 shrink-0 flex flex-col border-r border-surface-card-border bg-surface-dark">
+            {/* Sidebar header */}
+            <div className="px-3 py-3 border-b border-surface-card-border flex items-center gap-2">
+              <span className="text-[10px] font-bold text-hero-foreground uppercase tracking-wider flex-1">Participants</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-glow-primary/15 text-glow-primary border border-glow-primary/20">{participants.length}</span>
+            </div>
+            {/* Participant cards */}
+            <div className="flex-1 overflow-y-auto py-2 space-y-1 px-2">
+              {participants.map((p) => {
+                const lastMsg = [...messages].reverse().find(m => m.role === "participant" && m.participantId === p.id);
+                const isRecent = lastMsg && messages[messages.length - 1]?.participantId === p.id;
+                return (
+                  <div key={p.id} className={cn(
+                    "flex items-center gap-2.5 px-2 py-2 rounded-lg transition-colors",
+                    isRecent ? "bg-glow-primary/8 border border-glow-primary/15" : "hover:bg-surface-card/50"
+                  )}>
+                    <div className="relative shrink-0">
+                      <div className="w-[48px] h-[48px] rounded-full flex items-center justify-center text-white text-sm font-bold"
+                        style={{ background: `radial-gradient(circle at 35% 35%, ${p.color}cc, ${p.color}55)`, border: `2px solid ${p.color}44` }}>
+                        {p.initials}
+                      </div>
+                      <span className={cn("absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-surface-dark", isRecent ? "bg-green-400" : "bg-hero-muted/40")} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-hero-foreground truncate">{p.name}</p>
+                      <p className="text-[9px] text-hero-muted truncate">{p.gender}, {p.age_group}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Session info at bottom */}
+            <div className="px-3 py-3 border-t border-surface-card-border space-y-1">
+              <p className="text-[9px] text-hero-muted uppercase tracking-wider font-semibold">{DTYPE_LABELS[discussionType]}</p>
+              <p className="text-[9px] text-hero-muted truncate">{audienceLabel}</p>
+            </div>
+          </div>
+
+          {/* Right panel — chat area */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Status bar */}
+            <div className="px-4 py-2.5 border-b border-surface-card-border flex items-center justify-between gap-3 shrink-0 bg-surface-dark/50">
               <span className="flex items-center gap-1.5 text-xs font-semibold text-green-400">
                 <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                 Session Active
               </span>
-              <span className="text-hero-muted text-xs">·</span>
-              <span className="text-xs text-hero-muted">{DTYPE_LABELS[discussionType]}</span>
+              <Button size="sm" variant="outline" onClick={endSession} disabled={responding}
+                className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-1.5 text-xs h-7">
+                <StopCircle className="h-3 w-3" /> End Session
+              </Button>
             </div>
-            <div className="flex items-center gap-1.5">
-              {participants.map((p) => (
-                <div key={p.id} className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
-                  style={{ backgroundColor: p.color }} title={p.name}>
-                  {p.initials}
+
+            {/* Scrollable transcript */}
+            <div ref={transcriptRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+              {messages.map((msg) => (
+                <div key={msg.id}>
+                  {msg.role === "system" && (
+                    <div className="flex justify-center my-1">
+                      <span className="inline-block px-3 py-1 rounded-full bg-glow-accent/10 border border-glow-accent/20 text-[10px] text-glow-accent whitespace-pre-line text-center max-w-md">{msg.content}</span>
+                    </div>
+                  )}
+                  {msg.role === "participant" && (
+                    <div className="flex gap-2.5 justify-start">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5"
+                        style={{ background: `radial-gradient(circle at 35% 35%, ${msg.color}cc, ${msg.color}55)` }}>
+                        {msg.participantName?.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="max-w-sm">
+                        <p className="text-[10px] font-semibold mb-1" style={{ color: msg.color }}>{msg.participantName}</p>
+                        <div className="rounded-xl rounded-tl-sm bg-surface-dark border border-surface-card-border px-3 py-2.5">
+                          <p className="text-xs text-hero-foreground leading-relaxed">{msg.content}</p>
+                          <p className="text-[9px] text-hero-muted/50 mt-1.5 text-right">{msg.timestamp}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {msg.role === "moderator" && (
+                    <div className="flex gap-2.5 justify-end">
+                      <div className="max-w-sm">
+                        <div className="rounded-xl rounded-tr-sm bg-[#004638] border border-[#006650]/50 px-3 py-2.5">
+                          <p className="text-xs text-white leading-relaxed">{msg.content}</p>
+                          <p className="text-[9px] text-white/40 mt-1.5 text-right">{msg.timestamp}</p>
+                        </div>
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-[#004638] border border-[#006650]/50 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
+                        M
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
+              {responding && (
+                <div className="flex gap-2.5 justify-start">
+                  <div className="w-8 h-8 rounded-full bg-surface-dark border border-surface-card-border flex items-center justify-center shrink-0">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-hero-muted" />
+                  </div>
+                  <div className="rounded-xl rounded-tl-sm bg-surface-dark border border-surface-card-border px-3 py-2.5">
+                    <div className="flex gap-1 items-center h-4">
+                      <span className="w-1.5 h-1.5 rounded-full bg-hero-muted/50 animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-hero-muted/50 animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-hero-muted/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <Button size="sm" variant="outline" onClick={endSession} disabled={responding}
-              className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-1.5 text-xs h-7 ml-auto">
-              <StopCircle className="h-3 w-3" /> End Session
-            </Button>
-          </div>
 
-          {/* Transcript */}
-          <div ref={transcriptRef}
-            className="rounded-xl bg-surface-card border border-surface-card-border p-4 space-y-3 overflow-y-auto"
-            style={{ height: "400px" }}>
-            {messages.map((msg) => (
-              <div key={msg.id} className={cn(
-                "flex gap-3",
-                msg.role === "moderator" ? "justify-end" : "justify-start"
-              )}>
-                {msg.role === "participant" && (
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5"
-                    style={{ backgroundColor: msg.color }}>
-                    {msg.participantName?.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
-                {msg.role === "system" && (
-                  <div className="w-full text-center">
-                    <span className="inline-block px-3 py-1.5 rounded-full bg-glow-accent/10 border border-glow-accent/20 text-[10px] text-glow-accent whitespace-pre-line text-left max-w-lg">{msg.content}</span>
-                  </div>
-                )}
-                {msg.role !== "system" && (
-                  <div className={cn(
-                    "max-w-sm rounded-xl px-3 py-2 text-xs",
-                    msg.role === "moderator"
-                      ? "bg-[#004638] text-white rounded-br-sm"
-                      : "bg-surface-dark text-hero-foreground border border-surface-card-border rounded-bl-sm"
-                  )}>
-                    {msg.role === "participant" && (
-                      <p className="font-semibold mb-0.5" style={{ color: msg.color }}>{msg.participantName}</p>
-                    )}
-                    <p className="leading-relaxed">{msg.content}</p>
-                    <p className="text-[9px] opacity-50 mt-1 text-right">{msg.timestamp}</p>
-                  </div>
-                )}
-                {msg.role === "moderator" && (
-                  <div className="w-7 h-7 rounded-full bg-[#004638] flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
-                    M
-                  </div>
-                )}
-              </div>
-            ))}
-            {responding && (
-              <div className="flex gap-3 justify-start">
-                <div className="w-7 h-7 rounded-full bg-surface-dark border border-surface-card-border flex items-center justify-center shrink-0">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-hero-muted" />
-                </div>
-                <div className="bg-surface-dark border border-surface-card-border rounded-xl rounded-bl-sm px-3 py-2">
-                  <div className="flex gap-1 items-center h-4">
-                    <span className="w-1.5 h-1.5 rounded-full bg-hero-muted/50 animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-hero-muted/50 animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-hero-muted/50 animate-bounce" style={{ animationDelay: "300ms" }} />
-                  </div>
-                </div>
+            {/* Error */}
+            {apiError && (
+              <div className="mx-4 mb-2 flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/30 shrink-0">
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                <p className="text-xs text-destructive">{apiError}</p>
               </div>
             )}
-          </div>
 
-          {/* Error */}
-          {apiError && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
-              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-xs text-destructive">{apiError}</p>
+            {/* Bottom input area */}
+            <div className="px-4 pb-4 pt-2 space-y-2 border-t border-surface-card-border shrink-0 bg-surface-dark/30">
+              {/* Quick prompt chips */}
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {QUICK_PROMPTS.map((qp) => (
+                  <button key={qp.label} onClick={() => sendMessage(qp.text)} disabled={responding}
+                    className="px-3 py-1.5 rounded-full border border-surface-card-border text-[11px] text-hero-muted hover:text-glow-primary hover:border-glow-primary/40 transition-colors disabled:opacity-40 whitespace-nowrap shrink-0">
+                    {qp.label}
+                  </button>
+                ))}
+                <button onClick={synthesize} disabled={responding || messages.filter(m=>m.role!=="system").length < 4}
+                  className="px-3 py-1.5 rounded-full border border-glow-accent/30 text-[11px] text-glow-accent hover:bg-glow-accent/10 transition-colors disabled:opacity-40 flex items-center gap-1 whitespace-nowrap shrink-0">
+                  <Zap className="h-3 w-3" /> Synthesize
+                </button>
+              </div>
+              {/* Input row */}
+              <div className="flex gap-2 items-end">
+                <Textarea
+                  value={moderatorInput}
+                  onChange={(e) => setModeratorInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendMessage(moderatorInput); }}
+                  placeholder="Ask the group a question… (⌘/Ctrl+Enter to send)"
+                  rows={2}
+                  disabled={responding}
+                  className="bg-hero border-surface-card-border text-hero-foreground placeholder:text-hero-muted/50 text-sm resize-none flex-1"
+                />
+                <Button onClick={() => sendMessage(moderatorInput)} disabled={responding || !moderatorInput.trim()}
+                  className="bg-glow-primary hover:bg-glow-primary/90 text-white h-10 w-10 p-0 shrink-0">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          )}
-
-          {/* Quick prompts */}
-          <div className="flex flex-wrap gap-2">
-            {QUICK_PROMPTS.map((qp) => (
-              <button key={qp.label} onClick={() => sendMessage(qp.text)} disabled={responding}
-                className="px-3 py-1.5 rounded-full border border-surface-card-border text-xs text-hero-muted hover:text-glow-primary hover:border-glow-primary/40 transition-colors disabled:opacity-40">
-                {qp.label}
-              </button>
-            ))}
-            <button onClick={synthesize} disabled={responding || messages.filter(m=>m.role!=="system").length < 4}
-              className="px-3 py-1.5 rounded-full border border-glow-accent/30 text-xs text-glow-accent hover:bg-glow-accent/10 transition-colors disabled:opacity-40 flex items-center gap-1">
-              <Zap className="h-3 w-3" /> Synthesize
-            </button>
-          </div>
-
-          {/* Moderator input */}
-          <div className="flex gap-2">
-            <Textarea
-              value={moderatorInput}
-              onChange={(e) => setModeratorInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendMessage(moderatorInput); }}
-              placeholder="Ask the group a question… (⌘/Ctrl+Enter to send)"
-              rows={2}
-              disabled={responding}
-              className="bg-hero border-surface-card-border text-hero-foreground placeholder:text-hero-muted/50 text-sm resize-none flex-1"
-            />
-            <Button onClick={() => sendMessage(moderatorInput)} disabled={responding || !moderatorInput.trim()}
-              className="bg-glow-primary hover:bg-glow-primary/90 text-white self-end h-10 w-10 p-0 shrink-0">
-              <Send className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
@@ -897,9 +1233,10 @@ Transcript:\n${transcript}`,
                 <h4 className="text-xs font-bold text-hero-foreground uppercase tracking-wider">Key Quotes</h4>
                 <div className="grid md:grid-cols-2 gap-3">
                   {summary.keyQuotes.map((q, i) => (
-                    <div key={i} className="p-3 rounded-lg bg-surface-dark border border-surface-card-border space-y-1.5">
-                      <p className="text-xs text-hero-foreground/80 italic">"{q.quote}"</p>
-                      <p className="text-[10px] text-hero-muted font-medium">— {q.participant}</p>
+                    <div key={i} className="relative p-4 rounded-xl bg-surface-dark border border-surface-card-border space-y-2 overflow-hidden">
+                      <span className="absolute top-2 left-3 text-5xl leading-none text-glow-primary/15 font-serif select-none pointer-events-none">"</span>
+                      <p className="relative text-xs text-hero-foreground/80 italic leading-relaxed pt-3">{q.quote}</p>
+                      <p className="text-[10px] text-hero-muted font-semibold">— {q.participant}</p>
                     </div>
                   ))}
                 </div>
@@ -912,15 +1249,33 @@ Transcript:\n${transcript}`,
             <summary className="px-5 py-3 text-xs font-semibold text-hero-muted cursor-pointer hover:text-hero-foreground flex items-center gap-2 select-none">
               <MessageSquare className="h-3.5 w-3.5" /> View Full Transcript ({messages.filter(m=>m.role!=="system").length} exchanges)
             </summary>
-            <div className="px-5 pb-5 space-y-2 max-h-96 overflow-y-auto">
+            <div className="px-4 pb-4 space-y-3 max-h-96 overflow-y-auto">
               {messages.filter(m => m.role !== "system").map((msg) => (
-                <div key={msg.id} className="flex gap-2 text-xs">
-                  <span className={cn("font-semibold shrink-0 w-24",
-                    msg.role === "moderator" ? "text-[#004638]" : "")}
-                    style={msg.role === "participant" ? { color: msg.color } : undefined}>
-                    {msg.role === "moderator" ? "Moderator" : msg.participantName}:
-                  </span>
-                  <span className="text-hero-foreground/80">{msg.content}</span>
+                <div key={msg.id} className={cn("flex gap-2.5", msg.role === "moderator" ? "justify-end" : "justify-start")}>
+                  {msg.role === "participant" && (
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0 mt-0.5"
+                      style={{ background: `radial-gradient(circle at 35% 35%, ${msg.color}cc, ${msg.color}55)` }}>
+                      {msg.participantName?.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="max-w-xs">
+                    {msg.role === "participant" && (
+                      <p className="text-[9px] font-semibold mb-0.5" style={{ color: msg.color }}>{msg.participantName}</p>
+                    )}
+                    <div className={cn(
+                      "rounded-xl px-3 py-2 text-xs",
+                      msg.role === "moderator"
+                        ? "bg-[#004638] border border-[#006650]/50 text-white rounded-tr-sm"
+                        : "bg-surface-dark border border-surface-card-border text-hero-foreground/80 rounded-tl-sm"
+                    )}>
+                      {msg.content}
+                    </div>
+                  </div>
+                  {msg.role === "moderator" && (
+                    <div className="w-7 h-7 rounded-full bg-[#004638] border border-[#006650]/50 flex items-center justify-center text-white text-[9px] font-bold shrink-0 mt-0.5">
+                      M
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
