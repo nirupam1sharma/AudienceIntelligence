@@ -1,8 +1,8 @@
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import {
-  Users, BarChart2, FlaskConical, MessageSquare,
-  GitFork, Activity, ClipboardList,
+  Users, BarChart2, MessageSquare,
+  GitFork, Activity, Sparkles, Zap, Bot,
   HexagonIcon, Menu, X, ChevronRight, Key, Trash2, CheckCircle2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -15,17 +15,15 @@ import ConceptTesting from "@/components/concept-testing/ConceptTesting";
 import Orchestration from "@/components/orchestration/Orchestration";
 import FocusGroup from "@/components/focus-group/FocusGroup";
 import Monitor from "@/components/monitor/Monitor";
-import SurveySimulator from "@/components/survey-simulator/SurveySimulator";
 
 // ─── Sidebar modules ────────────────────────────────────────────
 const MODULES = [
-  { id: "audience-builder",  label: "Audience Builder",  icon: Users,          num: "01", mvp: true  },
-  { id: "intelligence",      label: "Audience Profile",  icon: BarChart2,       num: "02", mvp: true  },
-  { id: "concept-testing",   label: "Concept Testing",   icon: FlaskConical,    num: "03", mvp: true  },
-  { id: "focus-group",       label: "Focus Groups",      icon: MessageSquare,   num: "04", mvp: true  },
-  { id: "survey-simulator",  label: "Surveys",           icon: ClipboardList,   num: "05", mvp: true },
-  { id: "orchestration",     label: "Orchestration",     icon: GitFork,         num: "06", mvp: true },
-  { id: "monitor",           label: "Monitor",           icon: Activity,        num: "07", mvp: true },
+  { id: "audience-builder",  label: "Audience Builder",  icon: Users,         num: "01", mvp: true  },
+  { id: "intelligence",      label: "Audience Profiler", icon: BarChart2,     num: "02", mvp: true  },
+  { id: "personalisation",   label: "Personalisation",   icon: Sparkles,      num: "03", mvp: true  },
+  { id: "orchestration",     label: "Orchestration",     icon: GitFork,       num: "04", mvp: true  },
+  { id: "activation",        label: "Activation",        icon: Zap,           num: "05", mvp: false },
+  { id: "monitor",           label: "Monitor",           icon: Activity,      num: "06", mvp: true  },
 ];
 
 // ─── Placeholder for other modules ──────────────────────────────
@@ -46,8 +44,11 @@ const AudienceAnalysis = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const module = MODULES.find((m) => m.id === activeModule)!;
 
-  // Segment to auto-select when landing on Audience Profile
+  // Segment to auto-select when landing on Audience Profiler
   const [intelligenceSegmentId, setIntelligenceSegmentId] = useState<string | null>(null);
+
+  // Chat sub-module: "chat" | "digital-twins"
+  const [chatSubModule, setChatSubModule] = useState<"chat" | "digital-twins">("chat");
 
   const selectModule = (id: string) => {
     setActiveModule(id);
@@ -351,27 +352,27 @@ const AudienceAnalysis = () => {
 
         {/* Main content — on mobile starts below the 48px top bar */}
         <main className="flex-1 overflow-y-auto pt-12 md:pt-0">
-          {activeModule === "intelligence" ? (
+
+          {/* ── Audience Profiler ───────────────────────────────── */}
+          {activeModule === "intelligence" && (
             <div className="px-4 sm:px-8">
               <IntelligenceReport embedded initialSegmentId={intelligenceSegmentId} />
             </div>
-          ) : activeModule === "focus-group" ? (
+          )}
+
+          {/* ── Monitor ─────────────────────────────────────────── */}
+          {activeModule === "monitor" && (
             <div className="p-4 sm:p-8">
               <div className="mb-4 sm:mb-6">
-                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Focus Groups</h1>
-                <p className="text-hero-muted text-sm mt-1">Run AI-simulated focus groups with synthetic participants drawn from your audience</p>
-              </div>
-              <FocusGroup />
-            </div>
-          ) : activeModule === "monitor" ? (
-            <div className="p-4 sm:p-8">
-              <div className="mb-4 sm:mb-6">
-                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Brand Monitor</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Monitor</h1>
                 <p className="text-hero-muted text-sm mt-1">Track brand awareness, sentiment, and competitive positioning across online sources</p>
               </div>
               <Monitor />
             </div>
-          ) : activeModule === "orchestration" ? (
+          )}
+
+          {/* ── Orchestration ───────────────────────────────────── */}
+          {activeModule === "orchestration" && (
             <div className="p-4 sm:p-8">
               <div className="mb-4 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Orchestration</h1>
@@ -379,39 +380,80 @@ const AudienceAnalysis = () => {
               </div>
               <Orchestration />
             </div>
-          ) : activeModule === "survey-simulator" ? (
-            <div className="p-4 sm:p-8 max-w-3xl">
-              <div className="mb-4 sm:mb-6">
-                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Surveys</h1>
-                <p className="text-hero-muted text-sm mt-1">Field a custom survey with your audience and analyse results</p>
-              </div>
-              <SurveySimulator />
-            </div>
-          ) : (
+          )}
+
+          {/* ── Audience Builder ────────────────────────────────── */}
+          {activeModule === "audience-builder" && (
             <div className="p-4 sm:p-8 max-w-5xl">
-              <div className="mb-4 sm:mb-6">
-                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">{module.label}</h1>
-                <p className="text-hero-muted text-sm mt-1">
-                  {activeModule === "audience-builder" && "Define your target audience using segments or custom criteria"}
-                  {activeModule === "concept-testing" && "Test concepts and messaging with your audience"}
-                  {activeModule === "focus-group" && "Run qualitative research with targeted groups"}
-                  {activeModule === "monitor" && "Track audience changes and campaign performance"}
-                </p>
+              <div className="mb-4 sm:mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Audience Builder</h1>
+                  <p className="text-hero-muted text-sm mt-1">Define your target audience using segments or custom criteria</p>
+                </div>
+                <span className="flex-shrink-0 mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#004638]/10 text-[#004638] border border-[#004638]/20">
+                  <Users className="h-3 w-3" /> Agency view
+                </span>
               </div>
-              {activeModule === "audience-builder" && (
-                <AudienceBuilder
-                  onViewIntelligence={(segId) => {
-                    setIntelligenceSegmentId(segId);
-                    selectModule("intelligence");
-                  }}
-                />
-              )}
-              {activeModule === "concept-testing" && <ConceptTesting />}
-              {!["audience-builder", "concept-testing"].includes(activeModule) && !["focus-group", "monitor"].includes(activeModule) && (
-                <ComingSoon label={`${module.label} module coming soon`} />
-              )}
+              <AudienceBuilder
+                onViewIntelligence={(segId) => {
+                  setIntelligenceSegmentId(segId);
+                  selectModule("intelligence");
+                }}
+              />
             </div>
           )}
+
+          {/* ── Personalisation (Chat | Digital Twins) ──────────── */}
+          {activeModule === "personalisation" && (
+            <div className="p-4 sm:p-8">
+              <div className="mb-4 sm:mb-6">
+                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Personalisation</h1>
+                <p className="text-hero-muted text-sm mt-1">Chat with your audience data or simulate responses from digital twins</p>
+              </div>
+
+              {/* Sub-tabs */}
+              <div className="flex gap-1 p-1 rounded-lg bg-surface-dark/40 border border-surface-card-border w-fit mb-6">
+                <button
+                  onClick={() => setChatSubModule("chat")}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all",
+                    chatSubModule === "chat"
+                      ? "bg-[#004638] text-white shadow-sm"
+                      : "text-hero-muted hover:text-hero-foreground"
+                  )}
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Chat
+                </button>
+                <button
+                  onClick={() => setChatSubModule("digital-twins")}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all",
+                    chatSubModule === "digital-twins"
+                      ? "bg-[#004638] text-white shadow-sm"
+                      : "text-hero-muted hover:text-hero-foreground"
+                  )}
+                >
+                  <Bot className="h-3.5 w-3.5" />
+                  Digital Twins
+                </button>
+              </div>
+
+              {chatSubModule === "chat" && <ConceptTesting />}
+              {chatSubModule === "digital-twins" && <FocusGroup />}
+            </div>
+          )}
+
+          {/* ── Activation (coming soon) ─────────────────────────── */}
+          {activeModule === "activation" && (
+            <div className="p-4 sm:p-8 max-w-5xl">
+              <div className="mb-4 sm:mb-6">
+                <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Activation</h1>
+              </div>
+              <ComingSoon label="Activation is coming soon" />
+            </div>
+          )}
+
         </main>
       </div>
     </div>
