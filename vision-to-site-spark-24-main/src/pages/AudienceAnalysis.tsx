@@ -21,9 +21,9 @@ const MODULES = [
   { id: "audience-builder",  label: "Audience Builder",  icon: Users,         num: "01", mvp: true  },
   { id: "intelligence",      label: "Audience Profiler", icon: BarChart2,     num: "02", mvp: true  },
   { id: "personalisation",   label: "Personalisation",   icon: Sparkles,      num: "03", mvp: true  },
-  { id: "orchestration",     label: "Orchestration",     icon: GitFork,       num: "04", mvp: true  },
+  { id: "orchestration",     label: "Orchestration",     icon: GitFork,       num: "04", mvp: false },
   { id: "activation",        label: "Activation",        icon: Zap,           num: "05", mvp: false },
-  { id: "monitor",           label: "Monitor",           icon: Activity,      num: "06", mvp: true  },
+  { id: "monitor",           label: "Monitor",           icon: Activity,      num: "06", mvp: false },
 ];
 
 // ─── Placeholder for other modules ──────────────────────────────
@@ -360,25 +360,25 @@ const AudienceAnalysis = () => {
             </div>
           )}
 
-          {/* ── Monitor ─────────────────────────────────────────── */}
+          {/* ── Monitor (coming soon) ───────────────────────────── */}
           {activeModule === "monitor" && (
-            <div className="p-4 sm:p-8">
+            <div className="p-4 sm:p-8 max-w-5xl">
               <div className="mb-4 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Monitor</h1>
                 <p className="text-hero-muted text-sm mt-1">Track brand awareness, sentiment, and competitive positioning across online sources</p>
               </div>
-              <Monitor />
+              <ComingSoon label="Monitor is coming soon" />
             </div>
           )}
 
-          {/* ── Orchestration ───────────────────────────────────── */}
+          {/* ── Orchestration (coming soon) ─────────────────────── */}
           {activeModule === "orchestration" && (
-            <div className="p-4 sm:p-8">
+            <div className="p-4 sm:p-8 max-w-5xl">
               <div className="mb-4 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Orchestration</h1>
                 <p className="text-hero-muted text-sm mt-1">Generate brand strategy, communications plan, ad tactics, and media plan</p>
               </div>
-              <Orchestration />
+              <ComingSoon label="Orchestration is coming soon" />
             </div>
           )}
 
