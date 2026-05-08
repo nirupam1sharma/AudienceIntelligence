@@ -134,7 +134,30 @@
       "Bash(python3 /tmp/inject_varconfig_table.py)",
       "Bash(bun run *)",
       "mcp__Claude_in_Chrome__tabs_context_mcp",
-      "Bash(node buildChatRequirementsQs.js)"
+      "Bash(node buildChatRequirementsQs.js)",
+      "Bash(node buildMeetingScript.js)",
+      "Bash(node buildChatScope.js)",
+      "Bash(node buildChatStakeholderQs.js)",
+      "Bash(node buildAllModuleSpec.js)",
+      "Read(//dev/**)",
+      "Bash(node -e \"console.log\\('ok'\\)\")",
+      "Bash(python3 -m markitdown \"/Users/nirupamsharma/Documents/important docs/PRISM_BackendAlignment_JasonGalen.docx\")",
+      "Bash(python scripts/office/unpack.py \"/Users/nirupamsharma/Documents/important docs/PRISM_BackendAlignment_JasonGalen.docx\" /tmp/backend_unpacked/)",
+      "Bash(python scripts/office/pack.py /tmp/backend_unpacked/ \"/Users/nirupamsharma/Documents/important docs/PRISM_BackendAlignment_JasonGalen.docx\" --original \"/Users/nirupamsharma/Documents/important docs/PRISM_BackendAlignment_JasonGalen.docx\")",
+      "Bash(python -m markitdown \"/Users/nirupamsharma/Documents/important docs/PRISM_BackendAlignment_JasonGalen.docx\")",
+      "Bash(pandoc \"/Users/nirupamsharma/Documents/important docs/PRISM_BackendAlignment_JasonGalen.docx\" -t plain)",
+      "Bash(python scripts/office/unpack.py \"/Users/nirupamsharma/Downloads/PRISM_AI_module1-2_data_workshop.docx\" /tmp/workshop_unpacked/)",
+      "Bash(python scripts/office/pack.py /tmp/workshop_unpacked/ \"/Users/nirupamsharma/Downloads/PRISM_AI_module1-2_data_workshop.docx\" --original \"/Users/nirupamsharma/Downloads/PRISM_AI_module1-2_data_workshop.docx\")",
+      "Bash(node -e \"require\\('docx'\\); console.log\\('docx OK'\\)\")",
+      "Bash(node -e \"require\\('docx'\\); console.log\\('OK'\\)\")",
+      "Bash(node /tmp/buildITSetup.js)",
+      "Bash(pandoc --track-changes=all \"/Users/nirupamsharma/Downloads/PRISM_AI_module1-2_data_workshop.docx\" -o /tmp/workshop_content.md)",
+      "Bash(python scripts/office/unpack.py \"/Users/nirupamsharma/Downloads/PRISM_AI_module1-2_data_workshop.docx\" /tmp/workshop_orig/)",
+      "Bash(python -c ' *)",
+      "Bash(pandoc --track-changes=all \"/Users/nirupamsharma/Downloads/PRISM_AI_module1-2_data_workshop.docx\" -o /tmp/workshop_verify.md)",
+      "Read(//opt/homebrew/Cellar/pandoc/3.9.0.2/bin/**)",
+      "Bash(/opt/homebrew/bin/pandoc --track-changes=all \"/Users/nirupamsharma/Downloads/PRISM_AI_module1-2_data_workshop.docx\" -o /tmp/workshop_verify.md)",
+      "Bash(/opt/homebrew/bin/pandoc --version)"
     ]
   }
 }

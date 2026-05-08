@@ -1480,3 +1480,189 @@ export function downloadMonitorPdf(opts: MonitorExportOpts) {
   const slug = (opts.brand || "monitor").replace(/[^a-z0-9]/gi, "_").toLowerCase();
   doc.save(`Monitor_${slug}_${dateTag}.pdf`);
 }
+
+// ─── Audience Chat PDF ─────────────────────────────────────────────
+
+export interface AudienceChatExportOpts {
+  segmentLabel: string;
+  savedAt: string;
+  messages: Array<{ role: "user" | "ai"; content: string; timestamp: string }>;
+  aiInsights?: string;
+}
+
+export function downloadAudienceChatPdf(opts: AudienceChatExportOpts) {
+  const segLabel      = sanitize(opts.segmentLabel);
+  const { aiInsights } = opts;
+  const doc           = new jsPDF({ unit: "mm", format: "a4" });
+  const W             = pageW(doc);
+  let   page          = 1;
+
+  const TEAL_LIGHT    = "#dff4ed";
+  const RESEARCHER_BG = "#f4f4f7";
+
+  const dateStr  = new Date(opts.savedAt).toLocaleDateString("en-US", {
+    year: "numeric", month: "long", day: "numeric",
+  });
+  const userMsgs = opts.messages.filter(m => m.role === "user");
+  const chatMsgs = opts.messages.slice(1); // skip opening greeting
+
+  // ── Helper: open a continuation page with header + footer ────────
+  const newPage = (subtitle: string) => {
+    addFooter(doc, page++);
+    doc.addPage();
+    addHeader(doc, "Audience Chat Report", subtitle);
+    addFooter(doc, page);
+    return 30;
+  };
+
+  // ─────────────────────────────────────────────────────────────────
+  // PAGE 1 — Cover / Research Summary
+  // ─────────────────────────────────────────────────────────────────
+  addHeader(doc, "Audience Chat Report", `Audience: ${segLabel}`);
+  addFooter(doc, page);
+  let y = 28;
+
+  // ── Title banner ─────────────────────────────────────────────────
+  setFill(doc, BRAND);
+  doc.roundedRect(14, y, W - 28, 26, 2.5, 2.5, "F");
+
+  setTextColor(doc, WHITE);
+  doc.setFontSize(6.5); doc.setFont("helvetica", "bold");
+  doc.text("AUDIENCE RESEARCH REPORT", W / 2, y + 7, { align: "center" });
+
+  // Audience name — wrap if long
+  doc.setFontSize(13); doc.setFont("helvetica", "bold");
+  const nameLine = doc.splitTextToSize(segLabel, W - 60);
+  doc.text(nameLine.slice(0, 2), W / 2, y + 15, { align: "center" });
+  y += 32;
+
+  // ── Metadata strip — 3 cells with dividers ───────────────────────
+  const metaH    = 18;
+  const metaColW = (W - 28) / 3;
+
+  setFill(doc, BRAND_LIGHT);
+  setDraw(doc, BRAND);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(14, y, W - 28, metaH, 1.5, 1.5, "FD");
+
+  // vertical dividers
+  doc.setLineWidth(0.2);
+  doc.line(14 + metaColW,     y + 3, 14 + metaColW,     y + metaH - 3);
+  doc.line(14 + metaColW * 2, y + 3, 14 + metaColW * 2, y + metaH - 3);
+
+  [
+    { label: "AUDIENCE",  value: segLabel               },
+    { label: "DATE",      value: dateStr                 },
+    { label: "EXCHANGES", value: String(userMsgs.length) },
+  ].forEach((m, i) => {
+    const mx = 18 + i * metaColW;
+    setTextColor(doc, GREY_MID);
+    doc.setFontSize(6); doc.setFont("helvetica", "bold");
+    doc.text(m.label, mx, y + 5.5);
+    setTextColor(doc, GREY_DARK);
+    doc.setFontSize(9.5); doc.setFont("helvetica", "bold");
+    // Truncate long values so they don't overflow the cell
+    const truncated = m.value.length > 28 ? m.value.slice(0, 26) + "…" : m.value;
+    doc.text(truncated, mx, y + 14);
+  });
+  y += metaH + 8;
+
+  // ── AI Research Brief — executive summary (shown FIRST) ──────────
+  if (aiInsights) {
+    y = sectionTitle(doc, "AI-Generated Research Brief", y);
+
+    // Split on numbered headings: "1. AUDIENCE SNAPSHOT", "\n2. KEY THEMES" …
+    const sections = aiInsights.split(/(?=\n?\d\.\s)/);
+    for (const section of sections) {
+      if (!section.trim()) continue;
+      const nl      = section.indexOf("\n");
+      const heading = nl > -1 ? section.slice(0, nl).trim() : section.trim();
+      const body    = nl > -1 ? section.slice(nl + 1).trim() : "";
+
+      if (y > pageH(doc) - 42) {
+        y = newPage(`Research Brief — ${segLabel}`);
+      }
+
+      // Heading pill — BRAND bg, white text (strong contrast)
+      setFill(doc, BRAND);
+      doc.roundedRect(14, y, W - 28, 8, 1.2, 1.2, "F");
+      setTextColor(doc, WHITE);
+      doc.setFontSize(8); doc.setFont("helvetica", "bold");
+      doc.text(sanitize(heading), 18, y + 5.4);
+      y += 12;
+
+      if (body) {
+        setTextColor(doc, GREY_DARK);
+        doc.setFontSize(8); doc.setFont("helvetica", "normal");
+        const bodyLines = doc.splitTextToSize(sanitize(body), W - 28);
+        for (const line of bodyLines) {
+          if (y > pageH(doc) - 18) {
+            y = newPage(`Research Brief — ${segLabel}`);
+          }
+          doc.text(line, 14, y);
+          y += 4.5;
+        }
+        y += 5;
+      }
+    }
+
+    // Brief finished — transcript always starts on a fresh page
+    y = newPage(`Full Transcript — ${segLabel}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // TRANSCRIPT — on page 1 (no brief) or a new page (after brief)
+  // ─────────────────────────────────────────────────────────────────
+  y = sectionTitle(doc, "Conversation Transcript", y);
+
+  const bubbleMaxW = (W - 28) * 0.73;
+
+  for (const msg of chatMsgs) {
+    const isAI    = msg.role === "ai";
+    const bubbleX = isAI ? 14 : W - 14 - bubbleMaxW;
+
+    // Speaker label
+    doc.setFontSize(6.5); doc.setFont("helvetica", "bold");
+    setTextColor(doc, isAI ? BRAND : GREY_MID);
+    doc.text(
+      isAI ? segLabel.toUpperCase() : "RESEARCHER",
+      isAI ? bubbleX : bubbleX + bubbleMaxW,
+      y,
+      { align: isAI ? "left" : "right" },
+    );
+    y += 4;
+
+    // Wrap text
+    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    const lines   = doc.splitTextToSize(sanitize(msg.content), bubbleMaxW - 8);
+    const bubbleH = Math.max(lines.length * 4.5 + 8, 10);
+
+    if (y + bubbleH > pageH(doc) - 18) {
+      y = newPage(`Full Transcript — ${segLabel}`);
+    }
+
+    // Bubble — teal for audience, off-white for researcher
+    setFill(doc, isAI ? TEAL_LIGHT : RESEARCHER_BG);
+    setDraw(doc, isAI ? BRAND : GREY_LIGHT);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(bubbleX, y, bubbleMaxW, bubbleH, 2, 2, "FD");
+    setTextColor(doc, GREY_DARK);
+    doc.text(lines, bubbleX + 4, y + 6);
+
+    // Timestamp
+    doc.setFontSize(6); doc.setFont("helvetica", "normal");
+    setTextColor(doc, "#aaaaaa");
+    doc.text(
+      msg.timestamp,
+      isAI ? bubbleX + 3 : bubbleX + bubbleMaxW - 3,
+      y + bubbleH - 2,
+      { align: isAI ? "left" : "right" },
+    );
+
+    y += bubbleH + 6;
+  }
+
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const slug    = opts.segmentLabel.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  doc.save(`AudienceChat_${slug}_${dateTag}.pdf`);
+}

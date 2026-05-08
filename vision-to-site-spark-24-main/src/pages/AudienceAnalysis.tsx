@@ -2,7 +2,7 @@ import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import {
   Users, BarChart2, MessageSquare,
-  GitFork, Activity, Sparkles, Zap, Bot,
+  GitFork, Activity, Sparkles, Zap,
   HexagonIcon, Menu, X, ChevronRight, Key, Trash2, CheckCircle2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import IntelligenceReport from "@/components/intelligence/IntelligenceReport";
 import ConceptTesting from "@/components/concept-testing/ConceptTesting";
 import Orchestration from "@/components/orchestration/Orchestration";
 import FocusGroup from "@/components/focus-group/FocusGroup";
+import AudienceChat from "@/components/audience-chat/AudienceChat";
 import Monitor from "@/components/monitor/Monitor";
 
 // ─── Sidebar modules ────────────────────────────────────────────
@@ -47,7 +48,10 @@ const AudienceAnalysis = () => {
   // Segment to auto-select when landing on Audience Profiler
   const [intelligenceSegmentId, setIntelligenceSegmentId] = useState<string | null>(null);
 
-  // Chat sub-module: "chat" | "digital-twins"
+  // Segment to auto-select when landing on Personalisation chat
+  const [chatSegmentId, setChatSegmentId] = useState<string | null>(null);
+
+  // Digital twins sub-module toggle (kept for Digital Twins page if needed later)
   const [chatSubModule, setChatSubModule] = useState<"chat" | "digital-twins">("chat");
 
   const selectModule = (id: string) => {
@@ -356,7 +360,14 @@ const AudienceAnalysis = () => {
           {/* ── Audience Profiler ───────────────────────────────── */}
           {activeModule === "intelligence" && (
             <div className="px-4 sm:px-8">
-              <IntelligenceReport embedded initialSegmentId={intelligenceSegmentId} />
+              <IntelligenceReport
+                embedded
+                initialSegmentId={intelligenceSegmentId}
+                onChatWithAudience={(segId) => {
+                  setChatSegmentId(segId);
+                  selectModule("personalisation");
+                }}
+              />
             </div>
           )}
 
@@ -403,44 +414,16 @@ const AudienceAnalysis = () => {
             </div>
           )}
 
-          {/* ── Personalisation (Chat | Digital Twins) ──────────── */}
+          {/* ── Personalisation — Audience Chat (Module 3) ──────── */}
           {activeModule === "personalisation" && (
-            <div className="p-4 sm:p-8">
-              <div className="mb-4 sm:mb-6">
+            <div className="p-4 sm:p-8 max-w-4xl">
+              <div className="mb-5 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl font-bold text-hero-foreground">Personalisation</h1>
-                <p className="text-hero-muted text-sm mt-1">Chat with your audience data or simulate responses from digital twins</p>
+                <p className="text-hero-muted text-sm mt-1">
+                  Your audience speaks directly — ask them anything, explore discussion topics, or upload files to extend their knowledge
+                </p>
               </div>
-
-              {/* Sub-tabs */}
-              <div className="flex gap-1 p-1 rounded-lg bg-surface-dark/40 border border-surface-card-border w-fit mb-6">
-                <button
-                  onClick={() => setChatSubModule("chat")}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all",
-                    chatSubModule === "chat"
-                      ? "bg-[#004638] text-white shadow-sm"
-                      : "text-hero-muted hover:text-hero-foreground"
-                  )}
-                >
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  Chat
-                </button>
-                <button
-                  onClick={() => setChatSubModule("digital-twins")}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all",
-                    chatSubModule === "digital-twins"
-                      ? "bg-[#004638] text-white shadow-sm"
-                      : "text-hero-muted hover:text-hero-foreground"
-                  )}
-                >
-                  <Bot className="h-3.5 w-3.5" />
-                  Digital Twins
-                </button>
-              </div>
-
-              {chatSubModule === "chat" && <ConceptTesting />}
-              {chatSubModule === "digital-twins" && <FocusGroup />}
+              <AudienceChat initialSegmentId={chatSegmentId} />
             </div>
           )}
 
